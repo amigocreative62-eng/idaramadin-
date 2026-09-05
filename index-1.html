@@ -1,0 +1,1849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>IDARA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<!-- Firebase (compat build — plain script tags, no bundler needed) -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<style>
+:root{
+  --green-950:#07231A;
+  --green-900:#0B2E22;
+  --green-800:#0F3D2E;
+  --green-700:#155C43;
+  --mint-400:#5FE3AE;
+  --mint-300:#8FEECB;
+  --mint-050:#EAFBF3;
+  --white:#FFFFFF;
+  --gray-050:#F5F7F6;
+  --gray-200:#E3E8E5;
+  --ink:#16211D;
+  --muted-onlight:#66756F;
+  --line-onDark:rgba(255,255,255,.09);
+  --text-onDark:rgba(234,251,243,.86);
+  --text-onDark-dim:rgba(234,251,243,.5);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;height:100%;}
+body{
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  background:var(--gray-050);
+  color:var(--ink);
+  font-size:14px;
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;}
+.brand-word{font-family:'Inter',sans-serif;font-weight:800;letter-spacing:-.2px;}
+
+/* ---------------- Layout shell ---------------- */
+.app-shell{display:flex;min-height:100vh;}
+
+/* ---------------- Mobile top bar ---------------- */
+.hamburger-btn{
+  width:36px;height:36px;border-radius:9px;border:1px solid var(--gray-200);
+  background:var(--white);display:flex;align-items:center;justify-content:center;
+  cursor:pointer;flex:none;
+}
+.hamburger-btn svg{width:18px;height:18px;stroke:var(--green-800);}
+
+/* ---------------- App Header (persistent, mobile + desktop) ---------------- */
+.app-header{
+  position:sticky;top:0;z-index:40;background:var(--white);
+  border-bottom:1px solid var(--gray-200);
+  padding:11px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;
+}
+.ah-left{display:flex;align-items:center;gap:11px;min-width:0;}
+.ah-left .hamburger-btn{display:flex;}
+.ah-brandmark{
+  width:28px;height:28px;border-radius:8px;flex:none;
+  background:linear-gradient(155deg, var(--mint-400), var(--green-700));
+  display:flex;align-items:center;justify-content:center;
+}
+.ah-brandmark svg{width:14px;height:14px;stroke:var(--green-950);stroke-width:2.4;fill:none;}
+.ah-title{font-size:15px;font-weight:700;color:var(--green-900);line-height:1.2;letter-spacing:-.1px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:52vw;}
+.ah-date{font-size:11px;color:var(--muted-onlight);font-weight:500;margin-top:1px;}
+.ah-right{display:flex;align-items:center;gap:8px;flex:none;}
+.ah-icon-btn{
+  position:relative;width:34px;height:34px;border-radius:9px;border:1px solid var(--gray-200);
+  background:var(--white);display:flex;align-items:center;justify-content:center;cursor:pointer;
+}
+.ah-icon-btn svg{width:16px;height:16px;stroke:var(--muted-onlight);stroke-width:1.8;fill:none;}
+.ah-bell-dot{
+  position:absolute;top:6px;right:6px;width:7px;height:7px;border-radius:50%;
+  background:#B3432B;border:1.5px solid #fff;display:none;
+}
+.ah-bell-dot.show{display:block;}
+
+/* ---------------- Bottom tab bar ---------------- */
+.bottom-tabbar{
+  display:none;position:fixed;left:0;right:0;bottom:0;z-index:40;
+  background:var(--white);border-top:1px solid var(--gray-200);
+  padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+  align-items:center;justify-content:space-around;
+}
+.btab-item{
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:6px 18px;border-radius:10px;cursor:pointer;flex:1;
+  border:none;background:none;font-family:inherit;
+}
+.btab-item svg{width:19px;height:19px;stroke:var(--muted-onlight);stroke-width:1.8;fill:none;}
+.btab-item span{font-size:10.5px;font-weight:600;color:var(--muted-onlight);}
+.btab-item.active svg{stroke:var(--green-800);}
+.btab-item.active span{color:var(--green-800);font-weight:700;}
+
+/* ---------------- Scrim (mobile) ---------------- */
+.scrim{
+  position:fixed;inset:0;background:rgba(7,35,26,.45);z-index:45;
+  opacity:0;pointer-events:none;transition:opacity .18s ease;
+}
+.scrim.show{opacity:1;pointer-events:auto;}
+
+/* ---------------- Side menu ---------------- */
+.sidemenu{
+  width:280px;max-width:84vw;flex:none;
+  background:linear-gradient(180deg, var(--green-900) 0%, var(--green-950) 100%);
+  color:var(--text-onDark);
+  display:flex;flex-direction:column;
+  height:100vh;overflow-y:auto;
+  position:fixed;left:0;top:0;bottom:0;z-index:50;
+  transform:translateX(-100%);transition:transform .22s ease;
+}
+.sidemenu.open{transform:translateX(0);}
+.sidemenu::-webkit-scrollbar{width:6px;}
+.sidemenu::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:6px;}
+
+.menu-header{
+  padding:22px 20px 18px;
+  border-bottom:1px solid var(--line-onDark);
+  display:flex;align-items:center;gap:11px;
+}
+.brand-mark{
+  width:36px;height:36px;border-radius:10px;flex:none;
+  background:linear-gradient(155deg, var(--mint-400), var(--green-700));
+  display:flex;align-items:center;justify-content:center;
+}
+.brand-mark svg{width:19px;height:19px;stroke:var(--green-950);stroke-width:2.4;}
+.header-text .brand-word{font-size:20px;font-weight:700;color:var(--white);letter-spacing:.4px;line-height:1.1;}
+.header-text .brand-sub{font-size:11px;color:var(--text-onDark-dim);margin-top:3px;letter-spacing:.2px;font-weight:500;}
+
+.menu-list{padding:14px 10px 24px;flex:1;}
+
+/* ---- top-level item ---- */
+.menu-item{
+  display:flex;align-items:center;gap:12px;
+  padding:11px 12px;border-radius:9px;cursor:pointer;user-select:none;
+  color:var(--text-onDark);font-size:14px;font-weight:600;
+  margin-bottom:2px;position:relative;
+  transition:background .12s ease, color .12s ease;
+}
+.menu-item:hover{background:rgba(255,255,255,.05);}
+.menu-item.active{
+  background:rgba(95,227,174,.14);
+  color:var(--white);
+}
+.menu-item.active::before{
+  content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:3px;
+  background:var(--mint-400);
+}
+.menu-item.parent-active{color:var(--white);}
+.mi-icon{
+  width:19px;height:19px;flex:none;display:flex;align-items:center;justify-content:center;
+  color:var(--text-onDark-dim);
+}
+.menu-item.active .mi-icon,
+.menu-item.parent-active .mi-icon{color:var(--mint-400);}
+.mi-icon svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;}
+.mi-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:uppercase;letter-spacing:.4px;}
+.mi-chevron{
+  width:16px;height:16px;flex:none;display:flex;align-items:center;justify-content:center;
+  color:var(--text-onDark-dim);transition:transform .15s ease;
+}
+.mi-chevron svg{width:14px;height:14px;stroke:currentColor;stroke-width:2.2;fill:none;}
+.menu-group.open > .menu-item .mi-chevron{color:var(--mint-300);}
+
+/* ---- submenu ---- */
+.submenu{
+  display:grid;grid-template-rows:0fr;overflow:hidden;
+  transition:grid-template-rows .16s ease;
+  margin-bottom:2px;
+}
+.submenu > div{overflow:hidden;}
+.menu-group.open .submenu{grid-template-rows:1fr;}
+.submenu-inner{padding:2px 0 6px 0;}
+.submenu-item{
+  display:flex;align-items:center;gap:10px;
+  padding:8.5px 12px 8.5px 42px;
+  font-size:12.8px;font-weight:500;color:var(--text-onDark-dim);
+  border-radius:8px;cursor:pointer;position:relative;margin:0 0 1px;
+  transition:background .12s ease, color .12s ease;
+}
+.submenu-item::before{
+  content:"";position:absolute;left:29px;top:50%;width:4px;height:4px;border-radius:50%;
+  background:currentColor;opacity:.55;transform:translateY(-50%);
+}
+.submenu-item:hover{background:rgba(255,255,255,.04);color:var(--text-onDark);}
+.submenu-item.active{
+  background:rgba(95,227,174,.13);color:var(--white);font-weight:600;
+}
+.submenu-item.active::before{background:var(--mint-400);opacity:1;}
+
+
+/* ---------------- Content placeholder ---------------- */
+.content-area{flex:1;min-width:0;padding:32px;}
+.content-placeholder{
+  max-width:520px;margin:40px auto 0;text-align:center;
+  background:var(--white);border:1px solid var(--gray-200);border-radius:16px;
+  padding:36px 30px;
+}
+.content-placeholder .ph-icon{
+  width:52px;height:52px;border-radius:14px;margin:0 auto 16px;
+  background:var(--mint-050);display:flex;align-items:center;justify-content:center;
+}
+.content-placeholder .ph-icon svg{width:24px;height:24px;stroke:var(--green-700);stroke-width:1.8;fill:none;}
+.content-placeholder h2{margin:0 0 6px;font-weight:700;font-size:16px;color:var(--green-800);}
+.content-placeholder p{margin:0 0 4px;color:var(--muted-onlight);font-size:13.5px;line-height:1.6;}
+.content-placeholder .active-tag{
+  display:inline-block;margin-top:14px;padding:6px 14px;border-radius:99px;
+  background:var(--green-800);color:#fff;font-size:12.5px;font-weight:600;
+}
+
+/* ================================================================
+   DASHBOARD (Step 2)
+   ================================================================ */
+.dash{max-width:1180px;margin:0 auto;}
+
+/* ---- header ---- */
+/* ---- date filter segmented control ---- */
+.custom-range{
+  display:none;align-items:center;gap:6px;background:var(--white);
+  border:1px solid var(--gray-200);border-radius:10px;padding:6px 10px;
+}
+.custom-range.show{display:flex;}
+.custom-range input{
+  border:none;font-size:12.5px;color:var(--ink);font-family:inherit;background:transparent;width:118px;
+}
+.custom-range span{color:var(--muted-onlight);font-size:12px;}
+
+/* ---- section heading ---- */
+.section-heading{
+  display:flex;align-items:baseline;justify-content:space-between;
+  margin:26px 0 11px;
+}
+.section-heading h3{margin:0;font-size:13.5px;font-weight:700;color:var(--green-900);font-family:'Inter';text-transform:uppercase;letter-spacing:.5px;}
+.section-heading .see-all{font-size:11.5px;font-weight:600;color:var(--green-700);cursor:pointer;}
+.section-heading .see-all:hover{text-decoration:underline;}
+
+/* ---- financial overview cards ---- */
+.fin-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:12px;
+}
+.fin-card{
+  background:var(--white);border:1px solid var(--gray-200);border-radius:12px;
+  padding:15px 16px;position:relative;overflow:hidden;
+}
+.fin-card--primary{
+  grid-column:span 3;
+  background:var(--green-900);
+  border:none;color:#fff;padding:20px 22px;
+}
+.fin-card--tap{cursor:pointer;transition:border-color .12s ease, transform .1s ease;}
+.fin-card--tap:hover{border-color:var(--green-700);}
+.fin-card--tap:active{transform:scale(.98);}
+.fin-card--primary.fin-card--tap:hover{border-color:transparent;background:var(--green-800);}
+.fin-card-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.fin-icon{
+  width:32px;height:32px;border-radius:9px;background:var(--mint-050);
+  display:flex;align-items:center;justify-content:center;flex:none;
+}
+.fin-icon svg{width:15px;height:15px;stroke:var(--green-700);stroke-width:1.8;fill:none;}
+.fin-card--primary .fin-icon{background:rgba(255,255,255,.12);}
+.fin-card--primary .fin-icon svg{stroke:var(--mint-300);}
+.fin-label{font-size:10.8px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--muted-onlight);}
+.fin-card--primary .fin-label{color:rgba(234,251,243,.68);}
+.fin-value{font-weight:700;font-size:18px;color:var(--ink);line-height:1.25;margin-top:3px;letter-spacing:-.2px;}
+.fin-card--primary .fin-value{font-size:26px;color:#fff;font-weight:800;letter-spacing:-.4px;}
+.fin-sub{font-size:11px;color:var(--muted-onlight);margin-top:4px;font-weight:500;}
+.fin-card--primary .fin-sub{color:rgba(234,251,243,.62);}
+.fin-card--primary .fin-badge{background:rgba(95,227,174,.2);color:var(--mint-300);}
+
+/* ---- institution summary ---- */
+/* ---- stock summary ---- */
+/* ---- recent activities ---- */
+/* ---- empty state ---- */
+.empty-state-box{
+  text-align:center;padding:34px 20px;color:var(--muted-onlight);
+  background:var(--white);border:1px dashed var(--gray-200);border-radius:14px;
+}
+.empty-state-box svg{width:26px;height:26px;stroke:var(--gray-200);stroke-width:1.6;fill:none;margin-bottom:8px;}
+.empty-state-box p{margin:0;font-size:13px;}
+
+/* ---- notifications ---- */
+.notif-list{display:flex;flex-direction:column;gap:8px;margin-bottom:20px;}
+.notif-item{
+  display:flex;align-items:center;gap:12px;padding:12px 14px;
+  background:var(--white);border:1px solid var(--gray-200);border-radius:12px;
+}
+.notif-item.notif-unread{border-color:var(--green-700);background:var(--mint-050);}
+.notif-item.notif-warn{border-color:#F0D9A8;background:#FFFAF0;}
+.notif-icon{
+  width:34px;height:34px;border-radius:10px;flex:none;
+  display:flex;align-items:center;justify-content:center;background:var(--mint-050);
+}
+.notif-icon svg{width:16px;height:16px;stroke:var(--green-700);stroke-width:1.8;fill:none;}
+.notif-icon.act-expense{background:#FBEAE4;}
+.notif-icon.act-expense svg{stroke:#B3432B;}
+.notif-item.notif-warn .notif-icon{background:#FCEFCB;}
+.notif-item.notif-warn .notif-icon svg{stroke:#8A6414;}
+.notif-body{flex:1;min-width:0;}
+.notif-title{font-size:13.5px;font-weight:600;color:var(--ink);}
+.notif-meta{font-size:12px;color:var(--muted-onlight);margin-top:2px;}
+
+/* ---- search ---- */
+.search-hero{margin-bottom:16px;}
+.search-hero input{
+  width:100%;padding:12px 14px;border:1.5px solid var(--gray-200);border-radius:10px;font-size:14px;font-family:inherit;
+}
+.search-group-title{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted-onlight);margin:16px 0 8px;}
+.search-result{
+  display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--white);
+  border:1px solid var(--gray-200);border-radius:11px;margin-bottom:8px;
+}
+.search-result .fin-icon{width:32px;height:32px;flex:none;}
+.search-result .srb{flex:1;min-width:0;}
+.search-result .srt{font-size:13px;font-weight:600;color:var(--ink);}
+.search-result .srm{font-size:11.5px;color:var(--muted-onlight);margin-top:2px;}
+.org-chip{font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:99px;background:var(--mint-050);color:var(--green-700);flex:none;}
+
+/* ---- quick actions ---- */
+.qa-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+.qa-btn{
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  background:var(--white);border:1px solid var(--gray-200);border-radius:13px;
+  padding:16px 8px;cursor:pointer;transition:border-color .12s ease, transform .1s ease;
+}
+.qa-btn:hover{border-color:var(--green-700);}
+.qa-btn:active{transform:scale(.97);}
+.qa-icon{
+  width:38px;height:38px;border-radius:11px;background:var(--green-900);
+  display:flex;align-items:center;justify-content:center;
+}
+.qa-icon svg{width:18px;height:18px;stroke:var(--mint-300);stroke-width:1.8;fill:none;}
+.qa-label{font-size:11.5px;font-weight:600;color:var(--ink);text-align:center;line-height:1.25;}
+
+/* ---- toast ---- */
+.toast-wrap{position:fixed;bottom:20px;right:20px;left:auto;z-index:200;display:flex;flex-direction:column;gap:8px;align-items:flex-end;}
+.toast{
+  background:var(--green-900);color:#fff;padding:11px 16px;border-radius:10px;
+  font-size:12.8px;box-shadow:0 10px 30px rgba(0,0,0,.2);max-width:280px;
+}
+
+/* ---------------- Responsive ---------------- */
+@media (max-width:860px){
+  .content-area{padding:14px 12px 84px;}
+  .content-placeholder{margin-top:24px;padding:28px 20px;}
+  .qa-grid{grid-template-columns:repeat(2,1fr);}
+  .bottom-tabbar{display:flex;}
+  .toast-wrap{left:14px;right:14px;bottom:78px;align-items:stretch;}
+  .toast{max-width:none;}
+}
+@media (max-width:480px){
+  .fin-grid{grid-template-columns:1fr 1fr;}
+}
+
+/* ================================================================
+   ENTITY MODULES (Steps 3–9) — income/expense/stock/students/supporters
+   ================================================================ */
+.page-head{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:14px;
+  margin-bottom:18px;flex-wrap:wrap;
+}
+.page-head h1{font-size:17px;font-weight:700;color:var(--green-900);margin:0;letter-spacing:-.1px;}
+.page-head .crumb{font-size:12px;color:var(--muted-onlight);margin-top:3px;}
+.page-actions{display:flex;gap:8px;flex-wrap:wrap;}
+
+.btn{
+  border:none;border-radius:10px;padding:10px 16px;font-weight:700;font-size:13px;
+  cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  font-family:inherit;
+}
+.btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;}
+.btn-primary{background:var(--green-800);color:#fff;}
+.btn-primary:hover{background:var(--green-700);}
+.btn-mint{background:var(--mint-400);color:var(--green-950);}
+.btn-mint:hover{background:var(--mint-300);}
+.btn-ghost{background:var(--white);border:1.5px solid var(--gray-200);color:var(--ink);}
+.btn-ghost:hover{border-color:var(--green-700);}
+.btn-danger{background:#FBEAE4;color:#A5401F;}
+.btn-sm{padding:7px 12px;font-size:12px;border-radius:8px;}
+
+.panel{background:var(--white);border:1px solid var(--gray-200);border-radius:14px;margin-bottom:18px;}
+.panel-head{padding:15px 18px;border-bottom:1px solid var(--gray-050);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;}
+.panel-head h3{margin:0;font-size:14.5px;font-weight:700;color:var(--green-900);}
+.panel-body{padding:16px 18px;}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px;}
+.toolbar input[type=text],.toolbar input[type=date],.toolbar select{
+  padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:12.8px;
+  background:#fff;color:var(--ink);font-family:inherit;
+}
+.toolbar .search-box{flex:1;min-width:150px;position:relative;}
+.toolbar .search-box input{width:100%;padding-left:30px;}
+.toolbar .search-box::before{content:"";position:absolute;left:11px;top:50%;width:13px;height:13px;transform:translateY(-50%);
+  border:1.8px solid var(--muted-onlight);border-radius:50%;}
+.toolbar .search-box::after{content:"";position:absolute;left:20px;top:59%;width:6px;height:1.8px;background:var(--muted-onlight);transform:rotate(45deg);}
+.qf-group{display:flex;border:1px solid var(--gray-200);border-radius:9px;overflow:hidden;}
+.qf-btn{border:none;background:#fff;padding:7px 11px;font-size:12px;font-weight:600;color:var(--muted-onlight);cursor:pointer;}
+.qf-btn.active{background:var(--green-800);color:#fff;}
+.spacer{flex:1;}
+
+.table-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--gray-050);}
+table{width:100%;border-collapse:collapse;font-size:12.8px;min-width:560px;}
+thead th{
+  background:var(--gray-050);text-align:left;padding:10px 12px;font-size:10.8px;text-transform:uppercase;
+  letter-spacing:.4px;color:var(--muted-onlight);font-weight:700;border-bottom:1px solid var(--gray-200);white-space:nowrap;
+}
+tbody td{padding:10px 12px;border-bottom:1px solid var(--gray-050);vertical-align:middle;color:var(--ink);}
+tbody tr:last-child td{border-bottom:none;}
+tbody tr:hover{background:#FBFDFC;}
+.tag{display:inline-block;padding:3px 9px;border-radius:99px;font-size:10.8px;font-weight:700;}
+.tag-cash{background:var(--mint-050);color:var(--green-700);}
+.tag-account{background:#E8F0FA;color:#2B5B8C;}
+.tag-upi{background:#F3E9FA;color:#7A3FA0;}
+.tag-active{background:var(--mint-050);color:var(--green-700);}
+.tag-inactive{background:var(--gray-050);color:var(--muted-onlight);}
+.row-actions{display:flex;gap:6px;}
+.icon-btn{
+  border:1px solid var(--gray-200);background:#fff;border-radius:7px;width:28px;height:28px;
+  display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted-onlight);flex:none;
+}
+.icon-btn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.8;}
+.icon-btn:hover{border-color:var(--green-700);color:var(--green-700);}
+.icon-btn.danger:hover{border-color:#B3432B;color:#B3432B;}
+.low-stock{color:#B3432B;font-weight:700;}
+.amt-pos{color:var(--green-700);}
+.amt-neg{color:#A5401F;}
+.pagination{display:flex;justify-content:center;gap:6px;margin-top:14px;}
+.pagination button{border:1px solid var(--gray-200);background:#fff;border-radius:7px;padding:6px 11px;font-size:12px;cursor:pointer;}
+.pagination button.active{background:var(--green-800);color:#fff;border-color:var(--green-800);}
+
+/* ---- modal ---- */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(7,35,26,.5);display:flex;align-items:center;justify-content:center;
+  z-index:120;padding:18px;
+}
+.modal{background:#fff;border-radius:16px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 30px 70px rgba(0,0,0,.3);}
+.modal-head{padding:17px 20px;border-bottom:1px solid var(--gray-050);display:flex;justify-content:space-between;align-items:center;}
+.modal-head h3{margin:0;font-size:15.5px;color:var(--green-900);}
+.modal-close{background:none;border:none;font-size:19px;cursor:pointer;color:var(--muted-onlight);line-height:1;}
+.modal-body{padding:18px 20px;}
+.modal-foot{padding:15px 20px;border-top:1px solid var(--gray-050);display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;}
+
+/* ---- breakdown modal ---- */
+.bd-total{
+  background:var(--mint-050);border-radius:12px;padding:14px 16px;margin-bottom:16px;text-align:center;
+}
+.bd-total .bd-total-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--green-700);}
+.bd-total .bd-total-value{font-size:24px;font-weight:800;color:var(--green-900);letter-spacing:-.4px;margin-top:3px;}
+.bd-row{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:13px 14px;border:1px solid var(--gray-200);border-radius:11px;margin-bottom:8px;
+}
+.bd-row:last-child{margin-bottom:0;}
+.bd-org{font-size:13.5px;font-weight:700;color:var(--green-900);}
+.bd-value{font-size:15px;font-weight:700;color:var(--ink);}
+.bd-detail{display:flex;flex-direction:column;gap:6px;flex:1;}
+.bd-detail-line{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted-onlight);}
+.bd-detail-line b{color:var(--ink);font-weight:600;}
+.bd-detail-line.bd-balance-line{border-top:1px dashed var(--gray-200);padding-top:6px;margin-top:2px;}
+.bd-detail-line.bd-balance-line b{color:var(--green-800);font-weight:700;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px;}
+.form-grid .full{grid-column:1/-1;}
+.field label{display:block;font-size:11.8px;font-weight:700;color:var(--muted-onlight);margin-bottom:5px;}
+.field input,.field select,.field textarea{
+  width:100%;padding:9px 11px;border:1.5px solid var(--gray-200);border-radius:9px;font-size:13px;
+  background:#fff;color:var(--ink);font-family:inherit;
+}
+.field input:focus,.field select:focus,.field textarea:focus{outline:2px solid var(--mint-400);outline-offset:1px;border-color:var(--green-700);}
+.field-error{color:#B3432B;font-size:11px;margin-top:4px;}
+.form-error-banner{background:#FBEAE4;color:#A5401F;padding:9px 12px;border-radius:9px;font-size:12px;margin-bottom:14px;}
+
+/* ---- view profile modal ---- */
+.view-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;}
+.view-grid .full{grid-column:1/-1;}
+.view-item-label{font-size:10.8px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted-onlight);font-weight:700;}
+.view-item-value{font-size:13.5px;color:var(--ink);margin-top:2px;}
+.view-actions{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;}
+
+/* ---- report modal ---- */
+.report-period-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;}
+.report-period-grid .qf-btn{width:100%;border-radius:8px;border:1px solid var(--gray-200);padding:9px 6px;}
+
+/* ---- history ---- */
+/* ---- search page ---- */
+/* ---- MHS / settings ---- */
+.status-card{
+  display:flex;align-items:center;gap:12px;padding:15px 17px;border-radius:12px;
+  border:1px solid var(--gray-200);background:var(--white);margin-bottom:14px;
+}
+.status-dot{width:10px;height:10px;border-radius:50%;flex:none;background:#B3432B;}
+.status-dot.ok{background:var(--green-700);}
+.status-text b{display:block;font-size:13.5px;color:var(--ink);}
+.status-text span{font-size:12px;color:var(--muted-onlight);}
+.role-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.role-pill{
+  border:1.5px solid var(--gray-200);border-radius:9px;padding:10px 8px;text-align:center;
+  cursor:pointer;font-size:12.5px;font-weight:700;color:var(--muted-onlight);
+}
+.role-pill.active{border-color:var(--green-800);background:var(--green-800);color:#fff;}
+.warn-note{background:#FFFAF0;border:1px solid #F0D9A8;color:#8A6414;font-size:12px;padding:10px 13px;border-radius:10px;margin-top:10px;}
+
+@media (max-width:700px){
+  .form-grid,.view-grid{grid-template-columns:1fr;}
+  .report-period-grid{grid-template-columns:1fr 1fr;}
+  .role-grid{grid-template-columns:1fr 1fr;}
+
+  /* professional responsive tables -> record cards */
+  .table-wrap table{min-width:0;}
+  .table-wrap thead{display:none;}
+  .table-wrap tbody tr{
+    display:block;background:var(--white);border:1px solid var(--gray-050);border-radius:11px;
+    margin-bottom:9px;padding:4px 2px;
+  }
+  .table-wrap tbody tr:hover{background:var(--white);}
+  .table-wrap td{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    border-bottom:none;padding:7px 12px;text-align:right;
+  }
+  .table-wrap td:empty{display:none;}
+  .table-wrap td::before{
+    content:attr(data-label);font-size:10.8px;font-weight:700;text-transform:uppercase;
+    letter-spacing:.4px;color:var(--muted-onlight);text-align:left;flex:none;
+  }
+  .table-wrap td:last-child::before{content:"";}
+  .table-wrap .row-actions{justify-content:flex-end;width:100%;}
+}
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+
+  <div class="scrim" id="scrim" onclick="closeDrawer()"></div>
+
+  <aside class="sidemenu" id="sidemenu">
+    <div class="menu-header">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24"><path d="M4 20V10l8-6 8 6v10" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 20v-6h6v6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="header-text">
+        <div class="brand-word">IDARA</div>
+        <div class="brand-sub">Institution Management System</div>
+      </div>
+    </div>
+
+    <nav class="menu-list" id="menuList">
+
+      <!-- DASHBOARD -->
+      <div class="menu-item active" data-leaf="home" onclick="selectLeaf(this,'Dashboard')">
+        <span class="mi-label">Dashboard</span>
+      </div>
+
+      <!-- MAIC -->
+      <div class="menu-group" data-group="maic">
+        <div class="menu-item has-chevron" onclick="toggleGroup('maic')">
+          <span class="mi-label">MAIC</span>
+          <span class="mi-chevron" id="chev-maic">
+            <svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+        </div>
+        <div class="submenu" id="sub-maic"><div class="submenu-inner">
+          <div class="submenu-item" onclick="selectLeaf(this,'MAIC · Income')">Income</div>
+          <div class="submenu-item" onclick="selectLeaf(this,'MAIC · Expenses')">Expenses</div>
+          <div class="submenu-item" onclick="selectLeaf(this,'MAIC · Stock In')">Stock In</div>
+          <div class="submenu-item" onclick="selectLeaf(this,'MAIC · Stock Usage')">Stock Usage</div>
+          <div class="submenu-item" onclick="selectLeaf(this,'MAIC · Stock Balance')">Stock Balance</div>
+        </div></div>
+      </div>
+
+      <!-- MADIN -->
+      <div class="menu-group" data-group="madin">
+        <div class="menu-item has-chevron" onclick="toggleGroup('madin')">
+          <span class="mi-label">MADIN</span>
+          <span class="mi-chevron" id="chev-madin">
+            <svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+        </div>
+        <div class="submenu" id="sub-madin"><div class="submenu-inner">
+          <div class="submenu-item" onclick="selectLeaf(this,'MADIN · Income')">Income</div>
+          <div class="submenu-item" onclick="selectLeaf(this,'MADIN · Expenses')">Expenses</div>
+          <div class="submenu-item" onclick="selectLeaf(this,'MADIN · Stock In')">Stock In</div>
+          <div class="submenu-item" onclick="selectLeaf(this,'MADIN · Stock Usage')">Stock Usage</div>
+          <div class="submenu-item" onclick="selectLeaf(this,'MADIN · Stock Balance')">Stock Balance</div>
+        </div></div>
+      </div>
+
+      <!-- SWALATH -->
+      <div class="menu-group" data-group="swalath">
+        <div class="menu-item has-chevron" onclick="toggleGroup('swalath')">
+          <span class="mi-label">SWALATH</span>
+          <span class="mi-chevron" id="chev-swalath">
+            <svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+        </div>
+        <div class="submenu" id="sub-swalath"><div class="submenu-inner">
+          <div class="submenu-item" onclick="selectLeaf(this,'SWALATH · Income')">Income</div>
+          <div class="submenu-item" onclick="selectLeaf(this,'SWALATH · Expenses')">Expenses</div>
+          <div class="submenu-item" onclick="selectLeaf(this,'SWALATH · Stock In')">Stock In</div>
+          <div class="submenu-item" onclick="selectLeaf(this,'SWALATH · Stock Usage')">Stock Usage</div>
+          <div class="submenu-item" onclick="selectLeaf(this,'SWALATH · Stock Balance')">Stock Balance</div>
+        </div></div>
+      </div>
+
+      <!-- MHS -->
+      <div class="menu-group" data-group="mhs">
+        <div class="menu-item has-chevron" onclick="toggleGroup('mhs')">
+          <span class="mi-label">MHS</span>
+          <span class="mi-chevron" id="chev-mhs">
+            <svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+        </div>
+        <div class="submenu" id="sub-mhs"><div class="submenu-inner">
+          <div class="submenu-item" onclick="selectLeaf(this,'MHS · Income')">Income</div>
+          <div class="submenu-item" onclick="selectLeaf(this,'MHS · Expenses')">Expenses</div>
+          <div class="submenu-item" onclick="selectLeaf(this,'MHS · Stock In')">Stock In</div>
+          <div class="submenu-item" onclick="selectLeaf(this,'MHS · Stock Usage')">Stock Usage</div>
+          <div class="submenu-item" onclick="selectLeaf(this,'MHS · Stock Balance')">Stock Balance</div>
+        </div></div>
+      </div>
+
+      <!-- SUPPORTERS -->
+      <div class="menu-item" data-leaf="relations" onclick="selectLeaf(this,'Supporters')">
+        <span class="mi-label">Supporters</span>
+      </div>
+
+    </nav>
+  </aside>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column;">
+    <div class="app-header">
+      <div class="ah-left">
+        <button class="hamburger-btn" onclick="openDrawer()" aria-label="Open menu">
+          <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round"/></svg>
+        </button>
+        <div>
+          <div class="ah-title" id="headerTitle">Dashboard</div>
+          <div class="ah-date" id="headerDate"></div>
+        </div>
+      </div>
+      <div class="ah-right">
+        <button class="ah-icon-btn" id="headerSearch" onclick="renderSearchPage()" title="Search">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.3-4.3" stroke-linecap="round"/></svg>
+        </button>
+        <button class="ah-icon-btn" id="headerBell" onclick="renderNotificationsPage()" title="Notifications">
+          <svg viewBox="0 0 24 24"><path d="M12 3a5 5 0 0 0-5 5v3.2c0 .6-.2 1.2-.6 1.7L5 15h14l-1.4-2.1c-.4-.5-.6-1.1-.6-1.7V8a5 5 0 0 0-5-5z" stroke-linejoin="round"/><path d="M9.5 18.5a2.5 2.5 0 0 0 5 0" stroke-linecap="round"/></svg>
+          <span class="ah-bell-dot" id="headerBellDot"></span>
+        </button>
+      </div>
+    </div>
+
+    <div class="content-area" id="contentArea"></div>
+  </div>
+  <div class="bottom-tabbar" id="bottomTabbar">
+    <button class="btab-item" id="tab-dashboard" onclick="bottomTabClick('dashboard')">
+      <svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 10v9.5a1 1 0 0 0 1 1H9a1 1 0 0 0 1-1V15a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4.5a1 1 0 0 0 1 1h2.5a1 1 0 0 0 1-1V10" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Dashboard</span>
+    </button>
+    <button class="btab-item" id="tab-history" onclick="bottomTabClick('history')">
+      <svg viewBox="0 0 24 24"><path d="M4 4v6h6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.6 15a8 8 0 1 0 1.6-8.4L4 10" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 9v4l3 2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>History</span>
+    </button>
+    <button class="btab-item" id="tab-settings" onclick="bottomTabClick('settings')">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.6"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.9 2.9l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V20a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.9-2.9l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H4a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.9-2.9l.1.1a1.7 1.7 0 0 0 1.9.3H10a1.7 1.7 0 0 0 1-1.6V4a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.9 2.9l-.1.1a1.7 1.7 0 0 0-.3 1.9V10a1.7 1.7 0 0 0 1.6 1H20a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.6 1z" stroke-linejoin="round"/></svg>
+      <span>Settings</span>
+    </button>
+  </div>
+
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script>
+// ---------------------------------------------------------------
+// IDARA Side Menu — accordion groups, single-select active state,
+// mobile drawer open/close. No other app logic in this step.
+// ---------------------------------------------------------------
+let OPEN_GROUP = null;
+
+function toggleGroup(key){
+  const groupEl = document.querySelector(`.menu-group[data-group="${key}"]`);
+  const chevron = document.getElementById('chev-'+key);
+  const isOpen = groupEl.classList.contains('open');
+
+  // accordion: close whichever group is currently open (if different)
+  if(OPEN_GROUP && OPEN_GROUP !== key){
+    const prevGroup = document.querySelector(`.menu-group[data-group="${OPEN_GROUP}"]`);
+    const prevChevron = document.getElementById('chev-'+OPEN_GROUP);
+    if(prevGroup) prevGroup.classList.remove('open');
+    if(prevChevron) prevChevron.innerHTML = chevronRightSvg();
+  }
+
+  if(isOpen){
+    groupEl.classList.remove('open');
+    chevron.innerHTML = chevronRightSvg();
+    OPEN_GROUP = null;
+  } else {
+    groupEl.classList.add('open');
+    chevron.innerHTML = chevronDownSvg();
+    OPEN_GROUP = key;
+    // mark the parent row as "active family" without stealing the leaf active state
+    markParentActive(key);
+  }
+}
+
+function chevronRightSvg(){
+  return '<svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+}
+function chevronDownSvg(){
+  return '<svg viewBox="0 0 24 24"><path d="M5 9l7 7 7-7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+}
+
+function markParentActive(key){
+  document.querySelectorAll('.menu-group > .menu-item').forEach(el=>el.classList.remove('parent-active'));
+  const groupEl = document.querySelector(`.menu-group[data-group="${key}"] > .menu-item`);
+  if(groupEl) groupEl.classList.add('parent-active');
+}
+
+function selectLeaf(el, label){
+  // clear active state everywhere (top-level items + submenu items)
+  document.querySelectorAll('.menu-item, .submenu-item').forEach(n=>n.classList.remove('active'));
+  el.classList.add('active');
+
+  // if a submenu leaf was picked, keep its parent group visually emphasized
+  const parentGroupEl = el.closest('.menu-group');
+  document.querySelectorAll('.menu-group > .menu-item').forEach(n=>n.classList.remove('parent-active'));
+  if(parentGroupEl){
+    parentGroupEl.querySelector('.menu-item').classList.add('parent-active');
+  }
+
+  // the drawer is always an overlay now (mobile and desktop) — close it after navigating
+  closeDrawer();
+
+  // route to the real page for this menu item
+  routeLeaf(label);
+}
+
+function openDrawer(){
+  document.getElementById('sidemenu').classList.add('open');
+  document.getElementById('scrim').classList.add('show');
+}
+function closeDrawer(){
+  document.getElementById('sidemenu').classList.remove('open');
+  document.getElementById('scrim').classList.remove('show');
+}
+
+// ---------------- App header: title, date, notifications ----------------
+function setHeaderTitle(title){
+  const el = document.getElementById('headerTitle');
+  if(el) el.textContent = title;
+}
+function setActiveTab(key){
+  document.querySelectorAll('.btab-item').forEach(n=>n.classList.remove('active'));
+  if(key){ const e=document.getElementById('tab-'+key); if(e) e.classList.add('active'); }
+}
+function bottomTabClick(key){
+  document.querySelectorAll('.menu-item, .submenu-item').forEach(n=>n.classList.remove('active'));
+  if(key==='dashboard'){
+    const home = document.querySelector('.menu-item[data-leaf="home"]');
+    if(home) home.classList.add('active');
+    renderHome();
+  } else if(key==='history'){ renderHistoryPage(); }
+  else if(key==='settings'){ renderSettingsPage(); }
+}
+function updateHeaderDate(){
+  const el = document.getElementById('headerDate');
+  if(el) el.textContent = new Date().toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short'});
+}
+// Notifications are derived entirely from real data already in the app —
+// the activity log (DB.history) and live low-stock state — nothing here
+// is fabricated. "Unread" is tracked via a persisted last-seen timestamp.
+let NOTIF_LAST_SEEN = null;
+async function loadNotifSeen(){
+  try{ const r = await Storage.get('notif_seen', true); NOTIF_LAST_SEEN = r && r.value ? r.value : null; }
+  catch(e){ NOTIF_LAST_SEEN = null; }
+}
+async function markNotificationsSeen(){
+  NOTIF_LAST_SEEN = new Date().toISOString();
+  try{ await Storage.set('notif_seen', NOTIF_LAST_SEEN, true); }catch(e){}
+  refreshHeaderBell();
+}
+function unreadNotifCount(){
+  const lowCount = allLowStock().length;
+  const histCount = DB.history.filter(h=>!NOTIF_LAST_SEEN || h.at > NOTIF_LAST_SEEN).length;
+  return lowCount + histCount;
+}
+function refreshHeaderBell(){
+  const dot = document.getElementById('headerBellDot');
+  if(!dot) return;
+  dot.classList.toggle('show', unreadNotifCount() > 0);
+}
+function renderNotificationsPage(){
+  const el = document.getElementById('contentArea');
+  setHeaderTitle('Notifications');
+  setActiveTab(null);
+  document.querySelectorAll('.menu-item, .submenu-item').forEach(n=>n.classList.remove('active'));
+  const low = allLowStock();
+  const recentHistory = [...DB.history].reverse().slice(0,40);
+
+  const lowHtml = low.map(s=>`
+    <div class="notif-item notif-warn">
+      <div class="notif-icon"><svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01" stroke-linecap="round"/><path d="M10.3 3.9 2 18a2 2 0 0 0 1.7 3h16.6a2 2 0 0 0 1.7-3L14 3.9a2 2 0 0 0-3.4 0z" stroke-linejoin="round"/></svg></div>
+      <div class="notif-body">
+        <div class="notif-title">Low stock — ${escapeHtml(s.item)}</div>
+        <div class="notif-meta">${s.org} · ${s.current} ${s.unit} remaining</div>
+      </div>
+    </div>`).join('');
+
+  const histHtml = recentHistory.map(h=>`
+    <div class="notif-item ${(!NOTIF_LAST_SEEN || h.at>NOTIF_LAST_SEEN) ? 'notif-unread' : ''}">
+      <div class="notif-icon ${h.action==='Archived'?'act-expense':''}">${activityIcon(h.collection)}</div>
+      <div class="notif-body">
+        <div class="notif-title">${h.title}</div>
+        <div class="notif-meta">${historyCategory(h)}${h.meta ? ' · '+escapeHtml(h.meta) : ''} · ${fmtWhen(h.at)}</div>
+      </div>
+    </div>`).join('');
+
+  const isEmpty = low.length===0 && recentHistory.length===0;
+
+  el.innerHTML = `
+    <div class="page-head"><div class="crumb">Low stock alerts and recent activity across IDARA.</div></div>
+    ${isEmpty ? `
+      <div class="empty-state-box"><svg viewBox="0 0 24 24"><path d="M12 3a5 5 0 0 0-5 5v3.2c0 .6-.2 1.2-.6 1.7L5 15h14l-1.4-2.1c-.4-.5-.6-1.1-.6-1.7V8a5 5 0 0 0-5-5z" stroke-linejoin="round"/></svg><p>No notifications</p></div>
+    ` : `
+      ${low.length ? `<div class="section-heading"><h3>Needs Attention</h3></div><div class="notif-list">${lowHtml}</div>` : ''}
+      ${recentHistory.length ? `<div class="section-heading"><h3>Recent Activity</h3></div><div class="notif-list">${histHtml}</div>` : ''}
+    `}`;
+
+  markNotificationsSeen();
+}
+
+// ================================================================
+// DATA LAYER
+// Persists to Firestore (project: idaramadin) when available — this is
+// the real, shared, cross-device database. Falls back to window.storage
+// (Claude's own artifact storage, when run inside Claude) and then to
+// this browser's localStorage only if Firebase can't be reached, so the
+// app still works offline/misconfigured rather than breaking outright.
+// See Settings > Connections for live status.
+// ================================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyAdjqMTCx6q_El47SFoUDb77dDiAKj8STc",
+  authDomain: "idaramadin.firebaseapp.com",
+  projectId: "idaramadin",
+  storageBucket: "idaramadin.firebasestorage.app",
+  messagingSenderId: "502510230907",
+  appId: "1:502510230907:web:16b9e047f3e0b3b08e31de",
+  measurementId: "G-CH0MW8HR0C"
+};
+let firestoreDB = null;
+let FIREBASE_READY = false;
+let FIREBASE_ERROR = '';
+try{
+  if(typeof firebase !== 'undefined'){
+    const fbApp = firebase.initializeApp(firebaseConfig);
+    firestoreDB = firebase.firestore();
+    FIREBASE_READY = true;
+  } else {
+    FIREBASE_ERROR = 'Firebase SDK did not load (check network/ad-blocker).';
+  }
+}catch(e){
+  FIREBASE_ERROR = e.message || String(e);
+  console.error('Firebase init failed:', e);
+}
+
+const HAS_ARTIFACT_STORAGE = !!(window.storage && typeof window.storage.get==='function');
+const LS_PREFIX = 'idara_';
+const FIRESTORE_COLLECTION = 'idara_data'; // one doc per data collection, field "value" = JSON string
+
+const FirestoreStorage = {
+  async get(key){
+    const doc = await firestoreDB.collection(FIRESTORE_COLLECTION).doc(key).get();
+    if(!doc.exists) return null;
+    return {key, value: doc.data().value};
+  },
+  async set(key, value){
+    await firestoreDB.collection(FIRESTORE_COLLECTION).doc(key).set({value, updatedAt: new Date().toISOString()});
+    return {key, value};
+  }
+};
+const LocalStorageFallback = {
+  async get(key){ const raw = localStorage.getItem(LS_PREFIX+key); return raw==null ? null : {key, value:raw}; },
+  async set(key, value){ localStorage.setItem(LS_PREFIX+key, value); return {key, value}; }
+};
+const Storage = FIREBASE_READY ? FirestoreStorage : (HAS_ARTIFACT_STORAGE ? window.storage : LocalStorageFallback);
+const STORAGE_BACKEND = FIREBASE_READY ? 'firebase' : (HAS_ARTIFACT_STORAGE ? 'artifact' : 'local');
+
+const ORGS = ['MAIC','MADIN','SWALATH','MHS'];
+const SEED_ORGS = ['MAIC','MADIN','SWALATH']; // MHS starts empty — no fabricated demo numbers
+const COLLECTIONS = ['income','expense','stockin','stockout','supporters','history'];
+let DB = {income:[],expense:[],stockin:[],stockout:[],supporters:[],history:[]};
+
+function uid(){ return 'id-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8); }
+function money(n){ return '₹' + (Number(n)||0).toLocaleString('en-IN'); }
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function fmtDate(d){ if(!d) return '—'; const dt=new Date(d+'T00:00:00'); return isNaN(dt)?d:dt.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); }
+function fmtWhen(iso){
+  const dt = new Date(iso); const now = new Date();
+  const sameDay = dt.toDateString()===now.toDateString();
+  const y = new Date(now); y.setDate(now.getDate()-1);
+  const time = dt.toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit'});
+  if(sameDay) return 'Today, '+time;
+  if(dt.toDateString()===y.toDateString()) return 'Yesterday, '+time;
+  return dt.toLocaleDateString('en-GB',{day:'2-digit',month:'short'})+', '+time;
+}
+
+let STORAGE_ERROR_SHOWN = false;
+async function persist(collection){
+  try{ await Storage.set(collection, JSON.stringify(DB[collection])); }
+  catch(e){
+    console.error('Save failed for', collection, e);
+    if(!STORAGE_ERROR_SHOWN){
+      STORAGE_ERROR_SHOWN = true;
+      showToast(STORAGE_BACKEND==='firebase'
+        ? 'Could not save to the database — check Firestore rules/network.'
+        : 'Could not save — storage error.');
+      setTimeout(()=>{ STORAGE_ERROR_SHOWN = false; }, 4000);
+    }
+  }
+}
+async function loadAll(){
+  await Promise.all(COLLECTIONS.map(async c=>{
+    try{ const r = await Storage.get(c); DB[c] = r && r.value ? JSON.parse(r.value) : []; }
+    catch(e){ console.error('Load failed for', c, e); DB[c]=[]; }
+  }));
+  if(DB.income.length===0 && DB.expense.length===0){
+    await seedDemoData();
+  }
+}
+async function seedDemoData(){
+  // Realistic demo records so the dashboard isn't empty on a fresh start.
+  // These are ordinary records — edit or archive them like anything else.
+  const seed = {MAIC:{income:45000,expense:18000},MADIN:{income:52000,expense:22000},SWALATH:{income:50000,expense:20000}};
+  for(const org of SEED_ORGS){
+    await dbAdd('income', {org, date:todayStr(), amount:seed[org].income, paymentType:'Account', upiId:'', receiptNo:org.slice(0,2).toUpperCase()+'-1001', purpose:'Opening balance / monthly donations', notes:'Seed record'}, {silent:true});
+    await dbAdd('expense', {org, date:todayStr(), amount:seed[org].expense, paymentType:'Cash', upiId:'', voucherNo:org.slice(0,2).toUpperCase()+'-2001', purpose:'Monthly operating expenses', notes:'Seed record'}, {silent:true});
+  }
+  await dbAdd('stockin', {org:'MAIC', date:todayStr(), item:'Rice', qty:50, unit:'kg', source:'Local supplier', notes:''}, {silent:true});
+  await dbAdd('stockout', {org:'SWALATH', date:todayStr(), item:'Oil', qty:5, unit:'litre', purpose:'Kitchen use', notes:''}, {silent:true});
+  await dbAdd('stockin', {org:'SWALATH', date:todayStr(), item:'Oil', qty:20, unit:'litre', source:'Local supplier', notes:''}, {silent:true});
+}
+async function resetAllData(){
+  const confirmText = prompt('This permanently erases every income, expense, stock, student and supporter record on this device/site, then reloads fresh demo data.\n\nType RESET to confirm:');
+  if(confirmText !== 'RESET'){ showToast('Reset cancelled — nothing was changed.'); return; }
+  for(const c of COLLECTIONS){ DB[c] = []; await persist(c); }
+  await seedDemoData();
+  showToast('All data erased. Fresh demo data loaded.');
+  renderMHS();
+}
+async function logHistory(action, collection, org, title, meta, ref){
+  DB.history.push({id:uid(), action, collection, org:org||'—', title, meta, ref:ref||'', by:CURRENT_ROLE, at:new Date().toISOString()});
+  if(DB.history.length>500) DB.history = DB.history.slice(-500);
+  await persist('history');
+}
+async function dbAdd(collection, obj, opts){
+  obj.id = uid(); obj.archived=false; obj.createdAt = new Date().toISOString();
+  DB[collection].push(obj);
+  await persist(collection);
+  if(!opts||!opts.silent){ await logHistory('Added', collection, obj.org, historyTitle(collection,'add',obj), historyMeta(obj), historyRef(obj)); refreshHeaderBell(); }
+  return obj;
+}
+async function dbUpdate(collection, id, patch){
+  const row = DB[collection].find(r=>r.id===id); if(!row) return;
+  Object.assign(row, patch);
+  await persist(collection);
+  await logHistory('Updated', collection, row.org, historyTitle(collection,'update',row), historyMeta(row), historyRef(row));
+  refreshHeaderBell();
+}
+async function dbArchive(collection, id){
+  const row = DB[collection].find(r=>r.id===id); if(!row) return;
+  row.archived = true;
+  await persist(collection);
+  await logHistory('Archived', collection, row.org, historyTitle(collection,'archive',row), historyMeta(row), historyRef(row));
+  showToast('Archived.');
+  refreshHeaderBell();
+}
+function historyTitle(collection, action, row){
+  const map = {income:'Income', expense:'Expense', stockin:'Stock Received', stockout:'Stock Used', supporters:'Supporter'};
+  const noun = map[collection]||collection;
+  if(action==='add') return noun+' Added';
+  if(action==='update') return noun+' Updated';
+  return noun+' Archived';
+}
+function historyMeta(row){
+  if(row.amount!=null) return money(row.amount)+(row.purpose?' · '+row.purpose:'');
+  if(row.qty!=null) return row.qty+' '+(row.unit||'')+(row.item?' · '+row.item:'');
+  if(row.name) return row.name;
+  return '';
+}
+function historyRef(row){ return row.receiptNo || row.voucherNo || ''; }
+function historyCategory(h){
+  if(h.collection==='supporters') return 'Supporters';
+  if(h.org && ORGS.includes(h.org)) return h.org;
+  return 'MHS';
+}
+
+// ---------------- finance calculations ----------------
+function activeRows(collection, org){ return DB[collection].filter(r=>!r.archived && (!org||r.org===org)); }
+function paymentBreakdown(rows){ const s={Cash:0,Account:0,UPI:0}; rows.forEach(r=>{ s[r.paymentType]=(s[r.paymentType]||0)+Number(r.amount||0); }); return s; }
+function orgIncomeTotal(org){ return activeRows('income',org).reduce((a,r)=>a+Number(r.amount||0),0); }
+function orgExpenseTotal(org){ return activeRows('expense',org).reduce((a,r)=>a+Number(r.amount||0),0); }
+function orgBalance(org){ return orgIncomeTotal(org)-orgExpenseTotal(org); }
+function totalIncome(){ return ORGS.reduce((a,o)=>a+orgIncomeTotal(o),0); }
+function totalExpense(){ return ORGS.reduce((a,o)=>a+orgExpenseTotal(o),0); }
+function totalBalance(){ return ORGS.reduce((a,o)=>a+orgBalance(o),0); }
+
+// ---------------- Dashboard card breakdown modal ----------------
+// All values here are read live from the same orgIncomeTotal/orgExpenseTotal/
+// orgBalance functions the rest of the app uses — no separate calculation path.
+function openBreakdownModal(type){
+  const overlay = document.createElement('div'); overlay.className='modal-overlay';
+  const titles = {income:'Income Breakdown', expense:'Expense Breakdown', balance:'Balance Breakdown'};
+  const totalLabels = {income:'Total Income', expense:'Total Expenses', balance:'Total Balance'};
+  const totalValue = type==='income' ? totalIncome() : type==='expense' ? totalExpense() : totalBalance();
+
+  let rowsHtml = '';
+  if(type==='balance'){
+    rowsHtml = ORGS.map(org=>`
+      <div class="bd-row">
+        <div class="bd-detail">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span class="bd-org">${org}</span>
+          </div>
+          <div class="bd-detail-line"><span>Income</span><b>${money(orgIncomeTotal(org))}</b></div>
+          <div class="bd-detail-line"><span>Expense</span><b>${money(orgExpenseTotal(org))}</b></div>
+          <div class="bd-detail-line bd-balance-line"><span>Balance</span><b>${money(orgBalance(org))}</b></div>
+        </div>
+      </div>`).join('');
+  } else {
+    rowsHtml = ORGS.map(org=>{
+      const v = type==='income' ? orgIncomeTotal(org) : orgExpenseTotal(org);
+      return `<div class="bd-row"><span class="bd-org">${org}</span><span class="bd-value">${money(v)}</span></div>`;
+    }).join('');
+  }
+
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:420px;">
+      <div class="modal-head"><h3>${titles[type]}</h3><button class="modal-close" id="bdClose">&times;</button></div>
+      <div class="modal-body">
+        <div class="bd-total"><div class="bd-total-label">${totalLabels[type]}</div><div class="bd-total-value">${money(totalValue)}</div></div>
+        ${rowsHtml}
+      </div>
+      <div class="modal-foot"><button class="btn btn-ghost" id="bdClose2">Close</button></div>
+    </div>`;
+  document.body.appendChild(overlay);
+  const close = ()=>overlay.remove();
+  overlay.querySelector('#bdClose').onclick = close;
+  overlay.querySelector('#bdClose2').onclick = close;
+  overlay.addEventListener('click', e=>{ if(e.target===overlay) close(); });
+}
+
+// ---------------- stock calculations ----------------
+const LOW_STOCK_THRESHOLD = 10;
+function stockSummary(org){
+  const ins = activeRows('stockin', org), outs = activeRows('stockout', org);
+  const map = {};
+  ins.forEach(r=>{ const k=r.item.trim().toLowerCase(); map[k]=map[k]||{item:r.item,unit:r.unit,totalIn:0,totalOut:0}; map[k].totalIn+=Number(r.qty||0); map[k].unit=r.unit; });
+  outs.forEach(r=>{ const k=r.item.trim().toLowerCase(); map[k]=map[k]||{item:r.item,unit:r.unit,totalIn:0,totalOut:0}; map[k].totalOut+=Number(r.qty||0); });
+  return Object.values(map).map(x=>({...x, current:x.totalIn-x.totalOut}));
+}
+function currentQty(org, item){
+  const k=(item||'').trim().toLowerCase();
+  const row = stockSummary(org).find(r=>r.item.trim().toLowerCase()===k);
+  return row?row.current:0;
+}
+function allLowStock(){
+  let out=[]; ORGS.forEach(o=>stockSummary(o).forEach(s=>{ if(s.current<=LOW_STOCK_THRESHOLD) out.push({...s, org:o}); })); return out;
+}
+
+// ---------------- role (demo only — see MHS) ----------------
+let CURRENT_ROLE = 'Admin';
+const ROLE_ACCESS = { Admin:{write:true}, Accountant:{write:true}, Staff:{write:true}, Viewer:{write:false} };
+function canWrite(){ return ROLE_ACCESS[CURRENT_ROLE].write; }
+
+// ---------------- period filtering (Daily/Weekly/Monthly/Custom) ----------------
+function weekRange(anchor){
+  const d=new Date((anchor||todayStr())+'T00:00:00'); const day=d.getDay();
+  const start=new Date(d); start.setDate(d.getDate()-day); const end=new Date(start); end.setDate(start.getDate()+6);
+  return [start.toISOString().slice(0,10), end.toISOString().slice(0,10)];
+}
+function monthStr(d){ return (d||'').slice(0,7); }
+function inPeriod(dateStr, mode, from, to){
+  if(mode==='today') return dateStr===todayStr();
+  if(mode==='week'){ const [s,e]=weekRange(todayStr()); return dateStr>=s && dateStr<=e; }
+  if(mode==='month'){ return monthStr(dateStr)===monthStr(todayStr()); }
+  if(mode==='custom'){ return (!from||dateStr>=from) && (!to||dateStr<=to); }
+  return true; // 'all'
+}
+
+// ================================================================
+// GENERIC ENTITY MODULE — search / filter / table / add-edit modal
+// used for income, expense, stockin, stockout, supporters
+// ================================================================
+function renderEntityModule(container, cfg){
+  const state = { search:'', period:'all', from:'', to:'', extra:{}, page:1, pageSize:8, sort:'newest' };
+
+  function getRows(){
+    let rows = DB[cfg.collection].filter(r=>!r.archived && (!cfg.org||r.org===cfg.org));
+    if(state.search){
+      const s=state.search.toLowerCase();
+      rows = rows.filter(r=>cfg.searchFields.some(f=>String(r[f]||'').toLowerCase().includes(s)));
+    }
+    rows = rows.filter(r=>inPeriod(r[cfg.dateField||'date'], state.period, state.from, state.to));
+    (cfg.filterDefs||[]).forEach(fd=>{
+      const val = state.extra[fd.key];
+      if(val) rows = rows.filter(r=>r[fd.key]===val);
+    });
+    rows.sort((a,b)=>{
+      const da=a[cfg.dateField||'date']||a.createdAt||'', db_=b[cfg.dateField||'date']||b.createdAt||'';
+      return state.sort==='newest' ? (da<db_?1:-1) : (da>db_?1:-1);
+    });
+    return rows;
+  }
+
+  function draw(){
+    const all = getRows();
+    const totalPages = Math.max(1, Math.ceil(all.length/state.pageSize));
+    if(state.page>totalPages) state.page=totalPages;
+    const pageRows = all.slice((state.page-1)*state.pageSize, state.page*state.pageSize);
+
+    container.innerHTML = `
+      ${cfg.summary ? `<div class="fin-grid" style="margin-bottom:16px;">${cfg.summary(DB[cfg.collection].filter(r=>!r.archived && (!cfg.org||r.org===cfg.org)))}</div>` : ''}
+      <div class="panel">
+        <div class="panel-head">
+          <h3>${cfg.title}</h3>
+          ${canWrite() ? `<button class="btn btn-mint btn-sm" id="btnAdd"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>${cfg.addLabel||('Add '+cfg.singular)}</button>` : ''}
+        </div>
+        <div class="panel-body">
+          <div class="toolbar">
+            <div class="search-box"><input type="text" id="searchInput" placeholder="Search…" value="${escapeHtml(state.search)}"></div>
+            <div class="qf-group">
+              ${['all','today','week','month','custom'].map(p=>`<button class="qf-btn ${state.period===p?'active':''}" data-p="${p}">${p==='all'?'All':p==='today'?'Today':p==='week'?'This Week':p==='month'?'This Month':'Custom'}</button>`).join('')}
+            </div>
+            ${state.period==='custom' ? `<input type="date" id="fFrom" value="${state.from}"><span style="color:var(--muted-onlight);font-size:12px;">to</span><input type="date" id="fTo" value="${state.to}">` : ''}
+            ${(cfg.filterDefs||[]).map(fd=>`<select id="flt_${fd.key}"><option value="">${fd.label}: All</option>${fd.options.map(o=>`<option value="${o}" ${state.extra[fd.key]===o?'selected':''}>${o}</option>`).join('')}</select>`).join('')}
+            <div class="spacer"></div>
+            <select id="sortSel"><option value="newest" ${state.sort==='newest'?'selected':''}>Newest first</option><option value="oldest" ${state.sort==='oldest'?'selected':''}>Oldest first</option></select>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>${cfg.columns.map(c=>`<th>${c.label}</th>`).join('')}<th></th></tr></thead>
+              <tbody>
+                ${pageRows.length===0 ? `<tr><td colspan="${cfg.columns.length+1}"><div class="empty-state-box"><svg viewBox="0 0 24 24"><path d="M4 4v6h6M4.6 15a8 8 0 1 0 1.6-8.4L4 10" stroke-linecap="round" stroke-linejoin="round"/></svg><p>${cfg.emptyText||'No records found'}</p></div></td></tr>` :
+                pageRows.map(r=>rowHtml(r,cfg)).join('')}
+              </tbody>
+            </table>
+          </div>
+          ${totalPages>1 ? `<div class="pagination">${Array.from({length:totalPages},(_,i)=>i+1).map(p=>`<button class="${p===state.page?'active':''}" data-page="${p}">${p}</button>`).join('')}</div>` : ''}
+        </div>
+      </div>`;
+
+    container.querySelector('#searchInput').oninput = e=>{ state.search=e.target.value; state.page=1; draw(); };
+    container.querySelectorAll('.qf-group .qf-btn').forEach(b=>{ b.onclick=()=>{ state.period=b.dataset.p; state.page=1; draw(); }; });
+    const fFrom=container.querySelector('#fFrom'), fTo=container.querySelector('#fTo');
+    if(fFrom) fFrom.onchange=e=>{ state.from=e.target.value; draw(); };
+    if(fTo) fTo.onchange=e=>{ state.to=e.target.value; draw(); };
+    (cfg.filterDefs||[]).forEach(fd=>{ const el=container.querySelector('#flt_'+fd.key); if(el) el.onchange=e=>{ state.extra[fd.key]=e.target.value; state.page=1; draw(); }; });
+    const sortSel=container.querySelector('#sortSel'); if(sortSel) sortSel.onchange=e=>{ state.sort=e.target.value; draw(); };
+    const addBtn=container.querySelector('#btnAdd'); if(addBtn) addBtn.onclick=()=>openEntityForm(cfg,null,draw);
+    container.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>openViewModal(cfg, DB[cfg.collection].find(r=>r.id===b.dataset.view), draw));
+    container.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openEntityForm(cfg, DB[cfg.collection].find(r=>r.id===b.dataset.edit), draw));
+    container.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{ if(confirm('Archive this record? It can be restored from Firestore later, but will disappear from lists.')){ await dbArchive(cfg.collection, b.dataset.del); draw(); if(cfg.onChange) cfg.onChange(); } });
+    container.querySelectorAll('[data-pdf]').forEach(b=>b.onclick=()=>generateSingleRecordPDF(cfg, DB[cfg.collection].find(r=>r.id===b.dataset.pdf)));
+    container.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{ state.page=Number(b.dataset.page); draw(); });
+  }
+  draw();
+}
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function paymentTag(p){ const cls=p==='Cash'?'tag-cash':p==='Account'?'tag-account':'tag-upi'; return `<span class="tag ${cls}">${p}</span>`; }
+function rowHtml(r, cfg){
+  return `<tr>${cfg.columns.map(c=>`<td data-label="${escapeHtml(c.label)}">${c.render?c.render(r):escapeHtml(r[c.key]??'—')}</td>`).join('')}
+    <td data-label="Actions"><div class="row-actions">
+      ${cfg.viewable ? `<button class="icon-btn" data-view="${r.id}" title="View"><svg viewBox="0 0 24 24"><path d="M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7z"/><circle cx="12" cy="12" r="2.8"/></svg></button>` : ''}
+      ${cfg.printable && canWrite() ? `<button class="icon-btn" data-pdf="${r.id}" title="Download PDF"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M12 11v6M9 14l3 3 3-3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>` : ''}
+      ${canWrite() ? `<button class="icon-btn" data-edit="${r.id}" title="Edit"><svg viewBox="0 0 24 24"><path d="M4 20l1-4L16 5l3 3L8 19l-4 1z" stroke-linejoin="round"/></svg></button>` : ''}
+      ${canWrite() ? `<button class="icon-btn danger" data-del="${r.id}" title="Archive"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" stroke-linecap="round" stroke-linejoin="round"/></svg></button>` : ''}
+      ${(cfg.quickCall && (r.parentPhone||r.phone)) ? `<a class="icon-btn" href="tel:${r.parentPhone||r.phone}" title="Call"><svg viewBox="0 0 24 24"><path d="M4 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L14 13l5 2v4a2 2 0 0 1-2 2C9.5 21 3 14.5 3 6a2 2 0 0 1 1-2z" stroke-linejoin="round"/></svg></a>` : ''}
+      ${(cfg.quickWhatsapp && r.whatsapp) ? `<a class="icon-btn" href="https://wa.me/${String(r.whatsapp).replace(/\\D/g,'')}" target="_blank" title="WhatsApp"><svg viewBox="0 0 24 24"><path d="M4 20l1.4-4.1A8 8 0 1 1 9 19.5z" stroke-linejoin="round"/><path d="M8.5 9.5c0 3 2.5 5.5 5.5 5.5" stroke-linecap="round"/></svg></a>` : ''}
+    </div></td></tr>`;
+}
+function cardHtml(label, value, sub){
+  return `<div class="fin-card"><div class="fin-label">${label}</div><div class="fin-value" style="font-size:19px;">${value}</div>${sub?`<div class="fin-sub">${sub}</div>`:''}</div>`;
+}
+
+// ---------------- add/edit form modal ----------------
+function openEntityForm(cfg, existing, onDone){
+  const overlay = document.createElement('div'); overlay.className='modal-overlay';
+  const isEdit = !!existing;
+  overlay.innerHTML = `
+    <div class="modal">
+      <div class="modal-head"><h3>${isEdit?'Edit':'Add'} ${cfg.singular}</h3><button class="modal-close" id="mClose">&times;</button></div>
+      <div class="modal-body">
+        <div class="form-error-banner" id="formErr" style="display:none;"></div>
+        <div class="form-grid" id="formGrid"></div>
+      </div>
+      <div class="modal-foot"><button class="btn btn-ghost" id="mCancel">Cancel</button><button class="btn btn-primary" id="mSave">Save</button></div>
+    </div>`;
+  document.body.appendChild(overlay);
+  const grid = overlay.querySelector('#formGrid');
+  const fieldsToShow = cfg.org ? cfg.fields : cfg.fields; // org fixed via cfg.org; orgField included separately if cfg.needsOrgField
+  if(!cfg.org && cfg.needsOrgField){
+    const div = document.createElement('div'); div.className='field';
+    div.innerHTML = `<label>Organization *</label><select id="f_org">${ORGS.map(o=>`<option value="${o}" ${existing&&existing.org===o?'selected':''}>${o}</option>`).join('')}</select>`;
+    grid.appendChild(div);
+  }
+  fieldsToShow.forEach(f=>{
+    const val = existing ? (existing[f.key]??'') : (f.default ? (typeof f.default==='function'?f.default():f.default) : '');
+    const div = document.createElement('div'); div.className='field'+(f.full?' full':'');
+    let inputHtml='';
+    if(f.type==='select') inputHtml = `<select id="f_${f.key}">${(f.options||[]).map(o=>`<option value="${o}" ${val===o?'selected':''}>${o}</option>`).join('')}</select>`;
+    else if(f.type==='textarea') inputHtml = `<textarea id="f_${f.key}" rows="2">${escapeHtml(val)}</textarea>`;
+    else inputHtml = `<input type="${f.type||'text'}" id="f_${f.key}" value="${escapeHtml(val)}" ${f.step?`step="${f.step}"`:''} placeholder="${f.placeholder||''}">`;
+    div.innerHTML = `<label>${f.label}${f.required?' *':''}</label>${inputHtml}<div class="field-error" id="err_${f.key}" style="display:none;"></div>`;
+    grid.appendChild(div);
+  });
+  function close(){ overlay.remove(); }
+  overlay.querySelector('#mClose').onclick=close; overlay.querySelector('#mCancel').onclick=close;
+  overlay.addEventListener('click', e=>{ if(e.target===overlay) close(); });
+  overlay.querySelector('#mSave').onclick = async ()=>{
+    const obj = existing ? {...existing} : {};
+    obj.org = cfg.org || (overlay.querySelector('#f_org') ? overlay.querySelector('#f_org').value : obj.org);
+    let errors=[];
+    fieldsToShow.forEach(f=>{
+      const el = overlay.querySelector('#f_'+f.key); let v=el.value;
+      if(f.type==='number') v = v===''?'':Number(v);
+      if(f.required && (v===''||v==null)) errors.push([f.key,'"'+f.label+'" is required.']);
+      obj[f.key]=v;
+    });
+    if(cfg.extraValidate){ const err=cfg.extraValidate(obj, existing); if(err) errors.push([err.field||'_form', err.message]); }
+    const errBanner = overlay.querySelector('#formErr');
+    if(errors.length){ errBanner.style.display='block'; errBanner.textContent = errors.map(e=>e[1]).join(' · '); return; }
+    errBanner.style.display='none';
+    if(isEdit) await dbUpdate(cfg.collection, existing.id, obj); else await dbAdd(cfg.collection, obj);
+    showToast(isEdit?'Saved.':'Added.');
+    close(); onDone();
+  };
+}
+
+// ---------------- view / profile modal ----------------
+function openViewModal(cfg, row, onDone){
+  const overlay=document.createElement('div'); overlay.className='modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal">
+      <div class="modal-head"><h3>${cfg.singular} Profile</h3><button class="modal-close" id="vClose">&times;</button></div>
+      <div class="modal-body">
+        <div class="view-grid">
+          ${cfg.viewFields.map(f=>`<div class="${f.full?'full':''}"><div class="view-item-label">${f.label}</div><div class="view-item-value">${f.render?f.render(row):escapeHtml(row[f.key]||'—')}</div></div>`).join('')}
+        </div>
+        <div class="view-actions">
+          ${(cfg.quickCall && (row.parentPhone||row.phone)) ? `<a class="btn btn-ghost btn-sm" href="tel:${row.parentPhone||row.phone}">Call</a>` : ''}
+          ${(cfg.quickWhatsapp && row.whatsapp) ? `<a class="btn btn-mint btn-sm" href="https://wa.me/${String(row.whatsapp).replace(/\\D/g,'')}" target="_blank">WhatsApp Chat</a>` : ''}
+          ${canWrite() ? `<button class="btn btn-primary btn-sm" id="vEdit">Edit</button>` : ''}
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  const close=()=>overlay.remove();
+  overlay.querySelector('#vClose').onclick=close;
+  overlay.addEventListener('click', e=>{ if(e.target===overlay) close(); });
+  const editBtn = overlay.querySelector('#vEdit');
+  if(editBtn) editBtn.onclick = ()=>{ close(); openEntityForm(cfg, row, onDone); };
+}
+
+// ================================================================
+// ORG FINANCE / STOCK CONFIGS
+// ================================================================
+function incomeConfig(org){
+  return {
+    collection:'income', org, title:'Income', singular:'Income Entry', addLabel:'Add Income',
+    searchFields:['purpose','notes','receiptNo'], printable:true, needsOrgField:!org,
+    filterDefs:[{key:'paymentType', label:'Payment', options:['Cash','Account','UPI']}],
+    columns:[
+      {key:'date', label:'Date', render:r=>fmtDate(r.date)},
+      ...(org?[]:[{key:'org',label:'Org'}]),
+      {key:'purpose', label:'Description'},
+      {key:'amount', label:'Amount', render:r=>`<b class="amt-pos">+${money(r.amount)}</b>`},
+      {key:'paymentType', label:'Payment', render:r=>paymentTag(r.paymentType)},
+      {key:'receiptNo', label:'Reference No.'},
+    ],
+    summary(rows){ const s=paymentBreakdown(rows); const total=rows.reduce((a,r)=>a+Number(r.amount||0),0);
+      return [cardHtml('Total Income', money(total)), cardHtml('Cash', money(s.Cash||0)), cardHtml('Account', money(s.Account||0)), cardHtml('UPI', money(s.UPI||0))].join(''); },
+    fields:[
+      {key:'date', label:'Date', type:'date', required:true, default:todayStr},
+      {key:'amount', label:'Amount (₹)', type:'number', required:true, step:'0.01'},
+      {key:'paymentType', label:'Payment Type', type:'select', required:true, options:['Cash','Account','UPI'], default:'Cash'},
+      {key:'upiId', label:'UPI ID / Transaction ID', type:'text'},
+      {key:'receiptNo', label:'Receipt No.', type:'text', required:true},
+      {key:'purpose', label:'Purpose', type:'text', required:true, full:true},
+      {key:'notes', label:'Notes', type:'textarea', full:true},
+    ],
+    extraValidate(obj, existing){
+      if(Number(obj.amount)<0) return {field:'amount', message:'Amount cannot be negative.'};
+      if(obj.paymentType==='UPI' && !obj.upiId) return {field:'upiId', message:'UPI ID / Transaction ID is required for UPI payments.'};
+      const dup = DB.income.find(r=>!r.archived && r.org===obj.org && r.receiptNo===obj.receiptNo && (!existing||r.id!==existing.id));
+      if(dup) return {field:'receiptNo', message:'Receipt number must be unique within this organization.'};
+      return null;
+    }
+  };
+}
+function expenseConfig(org){
+  return {
+    collection:'expense', org, title:'Expenses', singular:'Expense Entry', addLabel:'Add Expense',
+    searchFields:['purpose','notes','voucherNo'], printable:true, needsOrgField:!org,
+    filterDefs:[{key:'paymentType', label:'Payment', options:['Cash','Account','UPI']}],
+    columns:[
+      {key:'date', label:'Date', render:r=>fmtDate(r.date)},
+      ...(org?[]:[{key:'org',label:'Org'}]),
+      {key:'purpose', label:'Description'},
+      {key:'amount', label:'Amount', render:r=>`<b class="amt-neg">−${money(r.amount)}</b>`},
+      {key:'paymentType', label:'Payment', render:r=>paymentTag(r.paymentType)},
+      {key:'voucherNo', label:'Reference No.'},
+    ],
+    summary(rows){ const s=paymentBreakdown(rows); const total=rows.reduce((a,r)=>a+Number(r.amount||0),0);
+      return [cardHtml('Total Expenses', money(total)), cardHtml('Cash', money(s.Cash||0)), cardHtml('Account', money(s.Account||0)), cardHtml('UPI', money(s.UPI||0))].join(''); },
+    fields:[
+      {key:'date', label:'Date', type:'date', required:true, default:todayStr},
+      {key:'amount', label:'Amount (₹)', type:'number', required:true, step:'0.01'},
+      {key:'paymentType', label:'Payment Type', type:'select', required:true, options:['Cash','Account','UPI'], default:'Cash'},
+      {key:'upiId', label:'UPI ID / Transaction ID', type:'text'},
+      {key:'voucherNo', label:'Voucher No.', type:'text', required:true},
+      {key:'purpose', label:'Purpose', type:'text', required:true, full:true},
+      {key:'notes', label:'Notes', type:'textarea', full:true},
+    ],
+    extraValidate(obj, existing){
+      if(Number(obj.amount)<0) return {field:'amount', message:'Amount cannot be negative.'};
+      if(obj.paymentType==='UPI' && !obj.upiId) return {field:'upiId', message:'UPI ID / Transaction ID is required for UPI payments.'};
+      const dup = DB.expense.find(r=>!r.archived && r.org===obj.org && r.voucherNo===obj.voucherNo && (!existing||r.id!==existing.id));
+      if(dup) return {field:'voucherNo', message:'Voucher number must be unique within this organization.'};
+      return null;
+    }
+  };
+}
+const STOCK_UNITS = ['pcs','kg','g','litre','ml','box','packet','bag'];
+function stockInConfig(org){
+  return {
+    collection:'stockin', org, title:'Stock In', singular:'Stock In Entry', addLabel:'Add Stock In',
+    searchFields:['item','source'], needsOrgField:!org,
+    columns:[
+      {key:'date', label:'Date', render:r=>fmtDate(r.date)},
+      ...(org?[]:[{key:'org',label:'Org'}]),
+      {key:'item', label:'Item'},
+      {key:'qty', label:'Qty', render:r=>`${r.qty} ${r.unit}`},
+      {key:'source', label:'Source'},
+    ],
+    fields:[
+      {key:'date', label:'Date', type:'date', required:true, default:todayStr},
+      {key:'item', label:'Item Name', type:'text', required:true},
+      {key:'qty', label:'Quantity', type:'number', required:true, step:'0.01'},
+      {key:'unit', label:'Unit', type:'select', required:true, options:STOCK_UNITS, default:'pcs'},
+      {key:'source', label:'Source', type:'text'},
+      {key:'notes', label:'Notes', type:'textarea', full:true},
+    ],
+    extraValidate(obj){ if(Number(obj.qty)<0) return {field:'qty', message:'Quantity cannot be negative.'}; return null; }
+  };
+}
+function stockOutConfig(org){
+  return {
+    collection:'stockout', org, title:'Stock Usage', singular:'Stock Usage Entry', addLabel:'Add Stock Usage',
+    searchFields:['item','purpose'], needsOrgField:!org,
+    columns:[
+      {key:'date', label:'Date', render:r=>fmtDate(r.date)},
+      ...(org?[]:[{key:'org',label:'Org'}]),
+      {key:'item', label:'Item'},
+      {key:'qty', label:'Qty Used', render:r=>`${r.qty} ${r.unit}`},
+      {key:'purpose', label:'Purpose'},
+    ],
+    fields:[
+      {key:'date', label:'Date', type:'date', required:true, default:todayStr},
+      {key:'item', label:'Item', type:'text', required:true},
+      {key:'qty', label:'Quantity Used', type:'number', required:true, step:'0.01'},
+      {key:'unit', label:'Unit', type:'select', required:true, options:STOCK_UNITS, default:'pcs'},
+      {key:'purpose', label:'Purpose', type:'text'},
+      {key:'notes', label:'Notes', type:'textarea', full:true},
+    ],
+    extraValidate(obj, existing){
+      if(Number(obj.qty)<0) return {field:'qty', message:'Quantity cannot be negative.'};
+      const orgForCheck = obj.org;
+      const available = currentQty(orgForCheck, obj.item) + (existing && existing.item===obj.item && existing.org===orgForCheck ? Number(existing.qty||0) : 0);
+      if(Number(obj.qty) > available) return {field:'qty', message:`Only ${available} ${obj.unit||''} of "${obj.item}" available in stock — cannot use more than that.`};
+      return null;
+    }
+  };
+}
+function supportersConfig(){
+  return {
+    collection:'supporters', title:'Supporters', singular:'Supporter', addLabel:'Add Supporter', viewable:true, quickCall:true, quickWhatsapp:true,
+    searchFields:['name','contact','phone'],
+    columns:[
+      {key:'name', label:'Name', render:r=>`<b>${escapeHtml(r.name)}</b>`},
+      {key:'contact', label:'Contact Person'},
+      {key:'phone', label:'Phone'},
+      {key:'whatsapp', label:'WhatsApp', render:r=>r.whatsapp?'Yes':'—'},
+    ],
+    viewFields:[
+      {key:'name', label:'Name'}, {key:'contact', label:'Contact Person'}, {key:'phone', label:'Phone'},
+      {key:'whatsapp', label:'WhatsApp'}, {key:'address', label:'Address', full:true}, {key:'notes', label:'Notes', full:true},
+    ],
+    fields:[
+      {key:'name', label:'Name', type:'text', required:true},
+      {key:'contact', label:'Contact Person', type:'text'},
+      {key:'address', label:'Address', type:'textarea', full:true},
+      {key:'phone', label:'Phone Number', type:'tel', required:true},
+      {key:'whatsapp', label:'WhatsApp Number', type:'tel'},
+      {key:'notes', label:'Notes', type:'textarea', full:true},
+    ],
+    extraValidate(obj){
+      if(obj.phone && !/^[0-9+\\-\\s]{7,15}$/.test(obj.phone)) return {field:'phone', message:'Enter a valid phone number.'};
+      return null;
+    }
+  };
+}
+// ================================================================
+// ORG PAGE (Income / Expenses / Stock In / Stock Usage / Stock Balance)
+// ================================================================
+function renderOrgPage(org, module){
+  const el = document.getElementById('contentArea');
+  const titles = {income:'Income', expense:'Expenses', stockin:'Stock In', stockout:'Stock Usage', stockbalance:'Stock Balance'};
+  setHeaderTitle(`${org} · ${titles[module]}`);
+  setActiveTab(null);
+  el.innerHTML = `
+    <div class="page-head">
+      <div class="crumb">${org} is kept completely separate from the other two sections.</div>
+      <div class="page-actions"><button class="btn btn-ghost btn-sm" id="btnOrgReport"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M12 11v6M9 14l3 3 3-3" stroke-linecap="round" stroke-linejoin="round"/></svg>Download ${org} Report</button></div>
+    </div>
+    <div id="orgModuleBody"></div>`;
+  document.getElementById('btnOrgReport').onclick = ()=>openReportModal(org);
+  const body = document.getElementById('orgModuleBody');
+  if(module==='income') renderEntityModule(body, incomeConfig(org));
+  else if(module==='expense') renderEntityModule(body, expenseConfig(org));
+  else if(module==='stockin') renderEntityModule(body, stockInConfig(org));
+  else if(module==='stockout') renderEntityModule(body, stockOutConfig(org));
+  else if(module==='stockbalance') renderStockBalance(body, org);
+}
+function renderStockBalance(container, org){
+  const rows = stockSummary(org).sort((a,b)=>a.item.localeCompare(b.item));
+  container.innerHTML = `
+    <div class="panel"><div class="panel-head"><h3>${org} — Current Stock</h3></div>
+    <div class="panel-body">
+      <div class="table-wrap"><table>
+        <thead><tr><th>Item</th><th>Total In</th><th>Total Out</th><th>Current Stock</th><th>Unit</th></tr></thead>
+        <tbody>${rows.length===0?`<tr><td colspan="5"><div class="empty-state-box"><svg viewBox="0 0 24 24"><path d="M21 8 12 3 3 8l9 5 9-5z" stroke-linejoin="round"/></svg><p>No stock data available</p></div></td></tr>`:
+        rows.map(r=>`<tr><td data-label="Item"><b>${escapeHtml(r.item)}</b></td><td data-label="Total In">${r.totalIn}</td><td data-label="Total Out">${r.totalOut}</td><td data-label="Current Stock" class="${r.current<=LOW_STOCK_THRESHOLD?'low-stock':''}">${r.current}${r.current<=LOW_STOCK_THRESHOLD?' ⚠':''}</td><td data-label="Unit">${r.unit}</td></tr>`).join('')}</tbody>
+      </table></div>
+    </div></div>`;
+}
+
+// ================================================================
+// SUPPORTERS PAGE
+// ================================================================
+function renderSupportersPage(){
+  const el = document.getElementById('contentArea');
+  setHeaderTitle('Supporters');
+  setActiveTab(null);
+  el.innerHTML = `
+    <div class="page-head"><div class="crumb">Donors, volunteers and other supporters of the institution.</div></div>
+    <div id="supportersBody"></div>`;
+  renderEntityModule(document.getElementById('supportersBody'), supportersConfig());
+}
+
+// ================================================================
+// MHS PAGE (clean structure, ready for future features)
+// ================================================================
+// ================================================================
+// SETTINGS PAGE (bottom tab bar)
+// ================================================================
+function renderSettingsPage(){
+  const el = document.getElementById('contentArea');
+  setHeaderTitle('Settings');
+  setActiveTab('settings');
+  el.innerHTML = `
+    <div class="page-head"><div class="crumb">Connections, access and data for this device.</div></div>
+
+    <div class="panel"><div class="panel-head"><h3>Connections</h3></div>
+      <div class="panel-body">
+        <div class="status-card">
+          <div class="status-dot ${FIREBASE_READY?'ok':''}"></div>
+          <div class="status-text">
+            ${FIREBASE_READY
+              ? `<b>Firestore — Connected</b><span>Project: idaramadin. Income, expense, stock, supporters and history are all saved to Firestore in real time — shared across every device that opens this app.</span>`
+              : `<b>Firestore — Connection Failed</b><span>${escapeHtml(FIREBASE_ERROR||'Could not reach Firebase.')} Data is falling back to ${STORAGE_BACKEND==='artifact'?'this Claude session':'this browser only'} until it reconnects.</span>`}
+          </div>
+        </div>
+        <div class="warn-note">Authentication is not enabled yet, and Firestore security rules may still be open (allow read/write to anyone with the project URL). Real access control needs Firebase Authentication + locked-down security rules — ask to have that wired in when you're ready.</div>
+      </div>
+    </div>
+
+    <div class="panel"><div class="panel-head"><h3>Role (interface preview only)</h3></div>
+      <div class="panel-body">
+        <div class="role-grid" id="roleGrid">
+          ${['Admin','Accountant','Staff','Viewer'].map(r=>`<div class="role-pill ${CURRENT_ROLE===r?'active':''}" data-role="${r}">${r}</div>`).join('')}
+        </div>
+        <div class="warn-note">This role switch only changes what buttons are shown in this browser — it is not real security. Add/Edit/Archive are hidden for Viewer, but nothing here is enforced by a server. Real permission enforcement needs Firebase Authentication + Firestore security rules.</div>
+      </div>
+    </div>
+
+    <div class="panel"><div class="panel-head"><h3>Backup &amp; Export</h3></div>
+      <div class="panel-body">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-mint btn-sm" id="btnBackup"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 21h16" stroke-linecap="round"/></svg>Full Backup (JSON)</button>
+          <button class="btn btn-ghost btn-sm" id="btnCsvIncome">Income (CSV)</button>
+          <button class="btn btn-ghost btn-sm" id="btnCsvExpense">Expense (CSV)</button>
+          <button class="btn btn-ghost btn-sm" id="btnCsvSupporters">Supporters (CSV)</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel"><div class="panel-head"><h3>Reset Data</h3></div>
+      <div class="panel-body">
+        <p style="font-size:12.5px;color:var(--muted-onlight);margin:0 0 12px;">
+          Storage here is tied to this domain, so old test entries can carry over between deployments.
+          Download a backup above first if you want to keep anything, then reset if you'd like to start clean.
+        </p>
+        <button class="btn btn-danger btn-sm" id="btnReset">Erase all data &amp; reload fresh demo data</button>
+      </div>
+    </div>`;
+
+  document.querySelectorAll('#roleGrid .role-pill').forEach(p=>{
+    p.onclick = ()=>{ CURRENT_ROLE = p.dataset.role; showToast('Viewing as '+CURRENT_ROLE+' (this browser only).'); renderSettingsPage(); };
+  });
+  document.getElementById('btnBackup').onclick = ()=>downloadText(`idara-backup-${todayStr()}.json`, JSON.stringify(DB,null,2));
+  document.getElementById('btnCsvIncome').onclick = ()=>downloadText(`income-${todayStr()}.csv`, toCSV(DB.income.filter(r=>!r.archived)));
+  document.getElementById('btnCsvExpense').onclick = ()=>downloadText(`expense-${todayStr()}.csv`, toCSV(DB.expense.filter(r=>!r.archived)));
+  document.getElementById('btnCsvSupporters').onclick = ()=>downloadText(`supporters-${todayStr()}.csv`, toCSV(DB.supporters.filter(r=>!r.archived)));
+  document.getElementById('btnReset').onclick = resetAllData;
+}
+
+// ================================================================
+// HISTORY PAGE (bottom tab bar)
+// ================================================================
+function renderHistoryPage(){
+  const el = document.getElementById('contentArea');
+  setHeaderTitle('History');
+  setActiveTab('history');
+  const rows = [...DB.history].reverse().slice(0,150);
+  el.innerHTML = `
+    <div class="page-head"><div class="crumb">Every add, update and archive across IDARA.</div></div>
+    ${rows.length===0 ? `<div class="empty-state-box"><svg viewBox="0 0 24 24"><path d="M4 4v6h6M4.6 15a8 8 0 1 0 1.6-8.4L4 10" stroke-linecap="round" stroke-linejoin="round"/></svg><p>No activity yet</p></div>` :
+    `<div class="notif-list">${rows.map(h=>`
+      <div class="notif-item ${h.action==='Archived'?'':''}">
+        <div class="notif-icon ${h.action==='Archived'?'act-expense':''}">${activityIcon(h.collection)}</div>
+        <div class="notif-body">
+          <div class="notif-title">${h.title}</div>
+          <div class="notif-meta">${historyCategory(h)}${h.meta ? ' · '+escapeHtml(h.meta) : ''} · ${fmtWhen(h.at)}</div>
+        </div>
+      </div>`).join('')}</div>`}`;
+}
+
+// ================================================================
+// SEARCH PAGE (header search icon)
+// ================================================================
+function renderSearchPage(){
+  const el = document.getElementById('contentArea');
+  setHeaderTitle('Search');
+  setActiveTab(null);
+  document.querySelectorAll('.menu-item, .submenu-item').forEach(n=>n.classList.remove('active'));
+  el.innerHTML = `
+    <div class="search-hero"><input type="text" id="globalSearchInput" placeholder="Search supporters, receipts, vouchers, stock…" autofocus></div>
+    <div id="searchResults"></div>`;
+  const input = document.getElementById('globalSearchInput');
+  input.oninput = ()=>doSearch(input.value.trim());
+  doSearch('');
+}
+function doSearch(q){
+  const out = document.getElementById('searchResults');
+  if(!q){ out.innerHTML = `<div class="empty-state-box"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.3-4.3" stroke-linecap="round"/></svg><p>Start typing to search across IDARA</p></div>`; return; }
+  const s = q.toLowerCase();
+  const supporters = DB.supporters.filter(r=>!r.archived && ((r.name||'').toLowerCase().includes(s) || (r.phone||'').includes(s)));
+  const incomes = DB.income.filter(r=>!r.archived && ((r.receiptNo||'').toLowerCase().includes(s) || (r.purpose||'').toLowerCase().includes(s)));
+  const expenses = DB.expense.filter(r=>!r.archived && ((r.voucherNo||'').toLowerCase().includes(s) || (r.purpose||'').toLowerCase().includes(s)));
+  const stockItems = [...DB.stockin, ...DB.stockout].filter(r=>!r.archived && (r.item||'').toLowerCase().includes(s));
+  const uniqItems = [...new Set(stockItems.map(r=>r.org+'|'+r.item))];
+
+  function group(title, items, render){
+    if(!items.length) return '';
+    return `<div class="search-group-title">${title} (${items.length})</div>${items.slice(0,20).map(render).join('')}`;
+  }
+  const html =
+    group('Supporters', supporters, r=>`<div class="search-result"><div class="fin-icon">${activityIcon('supporters')}</div><div class="srb"><div class="srt">${escapeHtml(r.name)}</div><div class="srm">${escapeHtml(r.phone||'')}</div></div></div>`) +
+    group('Income (Receipts)', incomes, r=>`<div class="search-result"><div class="fin-icon">${activityIcon('income')}</div><div class="srb"><div class="srt">${escapeHtml(r.receiptNo)} · ${money(r.amount)}</div><div class="srm">${escapeHtml(r.purpose||'')} · ${fmtDate(r.date)}</div></div><span class="org-chip">${r.org}</span></div>`) +
+    group('Expenses (Vouchers)', expenses, r=>`<div class="search-result"><div class="fin-icon">${activityIcon('expense')}</div><div class="srb"><div class="srt">${escapeHtml(r.voucherNo)} · ${money(r.amount)}</div><div class="srm">${escapeHtml(r.purpose||'')} · ${fmtDate(r.date)}</div></div><span class="org-chip">${r.org}</span></div>`) +
+    group('Stock Items', uniqItems, key=>{ const [org,item]=key.split('|'); return `<div class="search-result"><div class="fin-icon">${activityIcon('stockin')}</div><div class="srb"><div class="srt">${escapeHtml(item)}</div><div class="srm">Current stock: ${currentQty(org,item)}</div></div><span class="org-chip">${org}</span></div>`; });
+
+  out.innerHTML = html || `<div class="empty-state-box"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.3-4.3" stroke-linecap="round"/></svg><p>No matches for "${escapeHtml(q)}"</p></div>`;
+}
+
+function toCSV(rows){
+  if(!rows.length) return '';
+  const keys = Object.keys(rows[0]).filter(k=>k!=='archived');
+  const esc = v=>`"${String(v==null?'':v).replace(/"/g,'""')}"`;
+  return [keys.join(','), ...rows.map(r=>keys.map(k=>esc(r[k])).join(','))].join('\\n');
+}
+function downloadText(filename, text){
+  const blob=new Blob([text],{type:'text/plain'}); const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=filename; a.click(); URL.revokeObjectURL(url);
+  showToast('Downloaded '+filename);
+}
+
+// ================================================================
+// PDF REPORTS (Step 9)
+// ================================================================
+function activityIcon(type){
+  const icons = {
+    income:  '<svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    expense: '<svg viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    stockin: '<svg viewBox="0 0 24 24"><path d="M21 8 12 3 3 8l9 5 9-5z" stroke-linejoin="round"/><path d="M3 8v8l9 5 9-5V8" stroke-linejoin="round"/><path d="M12 13v8" /></svg>',
+    stockout:'<svg viewBox="0 0 24 24"><path d="M21 8 12 3 3 8l9 5 9-5z" stroke-linejoin="round"/><path d="M3 8v8l9 5 9-5V8" stroke-linejoin="round"/><path d="M12 13v8" stroke-dasharray="2 2"/></svg>',
+    supporters:'<svg viewBox="0 0 24 24"><path d="M8.5 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M15.5 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M3.5 19c.5-2.8 2.4-4.5 5-4.5s4.5 1.7 5 4.5" stroke-linecap="round"/></svg>',
+  };
+  return icons[type] || icons.income;
+}
+function periodLabel(mode, from, to){
+  if(mode==='today') return 'Today ('+fmtDate(todayStr())+')';
+  if(mode==='week'){ const [s,e]=weekRange(todayStr()); return 'This Week ('+fmtDate(s)+' – '+fmtDate(e)+')'; }
+  if(mode==='month') return 'This Month ('+new Date().toLocaleDateString('en-GB',{month:'long',year:'numeric'})+')';
+  if(mode==='custom') return 'Custom ('+(from?fmtDate(from):'…')+' – '+(to?fmtDate(to):'…')+')';
+  return 'All Time';
+}
+function openReportModal(org){
+  const overlay=document.createElement('div'); overlay.className='modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:420px;">
+      <div class="modal-head"><h3>${org?org+' Report':'Combined Report'}</h3><button class="modal-close" id="rClose">&times;</button></div>
+      <div class="modal-body">
+        <div class="report-period-grid">
+          <button class="qf-btn active" data-mode="today">Today</button>
+          <button class="qf-btn" data-mode="week">Weekly</button>
+          <button class="qf-btn" data-mode="month">Monthly</button>
+          <button class="qf-btn" data-mode="custom">Custom</button>
+        </div>
+        <div class="custom-range" id="rCustomRange" style="display:none;margin-bottom:10px;"><input type="date" id="rFrom"><span>to</span><input type="date" id="rTo"></div>
+        <p style="font-size:12.5px;color:var(--muted-onlight);margin:0;">Report includes Income, Expenses, Balance, Stock In and Stock Usage for the selected period.</p>
+      </div>
+      <div class="modal-foot"><button class="btn btn-ghost" id="rCancel">Cancel</button><button class="btn btn-primary" id="rGenerate">Generate PDF</button></div>
+    </div>`;
+  document.body.appendChild(overlay);
+  let mode='today', from='', to='';
+  overlay.querySelectorAll('.report-period-grid .qf-btn').forEach(b=>{
+    b.onclick=()=>{ overlay.querySelectorAll('.report-period-grid .qf-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); mode=b.dataset.mode;
+      overlay.querySelector('#rCustomRange').style.display = mode==='custom' ? 'flex' : 'none'; };
+  });
+  overlay.querySelector('#rFrom').onchange = e=>from=e.target.value;
+  overlay.querySelector('#rTo').onchange = e=>to=e.target.value;
+  const close=()=>overlay.remove();
+  overlay.querySelector('#rClose').onclick=close; overlay.querySelector('#rCancel').onclick=close;
+  overlay.addEventListener('click', e=>{ if(e.target===overlay) close(); });
+  overlay.querySelector('#rGenerate').onclick = ()=>{
+    if(org) generateOrgReportPDF(org, mode, from, to); else generateCombinedReportPDF(mode, from, to);
+    close();
+  };
+}
+function reportRows(collection, org, mode, from, to){
+  return activeRows(collection, org).filter(r=>inPeriod(r.date, mode, from, to));
+}
+function pdfHeader(doc, subtitle){
+  doc.setFillColor(11,46,34); doc.rect(0,0,210,24,'F');
+  doc.setFontSize(16); doc.setTextColor(255,255,255); doc.setFont(undefined,'bold'); doc.text('IDARA', 14, 14);
+  doc.setFontSize(8.5); doc.setTextColor(180,230,205); doc.setFont(undefined,'normal'); doc.text('Smart Management. Simple & Organized.', 14, 19.5);
+  doc.setFontSize(10.5); doc.setTextColor(255,255,255); doc.setFont(undefined,'bold');
+  doc.text(subtitle, 196, 14, {align:'right'});
+  doc.setFont(undefined,'normal');
+}
+function pdfFooter(doc){
+  const pageCount = doc.internal.getNumberOfPages();
+  for(let i=1;i<=pageCount;i++){
+    doc.setPage(i);
+    doc.setFontSize(8); doc.setTextColor(150,155,150);
+    doc.text('Generated by IDARA on '+new Date().toLocaleDateString('en-GB')+' — for official institutional record', 14, 289);
+    doc.text('Page '+i+' of '+pageCount, 196, 289, {align:'right'});
+  }
+}
+function generateOrgReportPDF(org, mode, from, to){
+  if(typeof window.jspdf==='undefined'){ showToast('PDF library did not load — check your connection.'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const inc = reportRows('income', org, mode, from, to), exp = reportRows('expense', org, mode, from, to);
+  const stIn = reportRows('stockin', org, mode, from, to), stOut = reportRows('stockout', org, mode, from, to);
+  const totalInc = inc.reduce((a,r)=>a+Number(r.amount||0),0), totalExp = exp.reduce((a,r)=>a+Number(r.amount||0),0);
+
+  pdfHeader(doc, org+' Report');
+  doc.setFontSize(9.5); doc.setTextColor(100,110,105); doc.text('Period: '+periodLabel(mode,from,to), 14, 31);
+  doc.setFontSize(11); doc.setTextColor(20,30,25);
+  doc.text('Income: '+money(totalInc)+'    Expenses: '+money(totalExp)+'    Balance: '+money(totalInc-totalExp), 14, 39);
+
+  doc.autoTable({ startY:45, head:[['Date','Receipt #','Purpose','Payment','Amount']],
+    body: inc.map(r=>[fmtDate(r.date), r.receiptNo, r.purpose||'', r.paymentType, money(r.amount)]),
+    headStyles:{fillColor:[11,46,34]}, styles:{fontSize:9}, margin:{left:14,right:14},
+    foot:[['','','','Total', money(totalInc)]], footStyles:{fillColor:[234,251,243], textColor:[11,46,34]} });
+
+  let y = doc.lastAutoTable.finalY + 8;
+  doc.setFontSize(12); doc.setTextColor(11,46,34); doc.text('Expenses', 14, y); y+=4;
+  doc.autoTable({ startY:y, head:[['Date','Voucher #','Purpose','Payment','Amount']],
+    body: exp.map(r=>[fmtDate(r.date), r.voucherNo, r.purpose||'', r.paymentType, money(r.amount)]),
+    headStyles:{fillColor:[11,46,34]}, styles:{fontSize:9}, margin:{left:14,right:14},
+    foot:[['','','','Total', money(totalExp)]], footStyles:{fillColor:[251,234,228], textColor:[165,64,31]} });
+
+  y = doc.lastAutoTable.finalY + 8;
+  doc.setFontSize(12); doc.setTextColor(11,46,34); doc.text('Stock Movement', 14, y); y+=4;
+  doc.autoTable({ startY:y, head:[['Type','Date','Item','Qty','Unit']],
+    body: [...stIn.map(r=>['Stock In', fmtDate(r.date), r.item, r.qty, r.unit]), ...stOut.map(r=>['Stock Usage', fmtDate(r.date), r.item, r.qty, r.unit])],
+    headStyles:{fillColor:[11,46,34]}, styles:{fontSize:9}, margin:{left:14,right:14} });
+
+  pdfFooter(doc);
+  doc.save(`${org}-report-${todayStr()}.pdf`);
+  showToast('Report downloaded.');
+}
+function generateCombinedReportPDF(mode, from, to){
+  if(typeof window.jspdf==='undefined'){ showToast('PDF library did not load — check your connection.'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  pdfHeader(doc, 'Combined Report');
+  doc.setFontSize(9.5); doc.setTextColor(100,110,105); doc.text('Period: '+periodLabel(mode,from,to), 14, 31);
+
+  const perOrg = ORGS.map(org=>{
+    const inc = reportRows('income',org,mode,from,to).reduce((a,r)=>a+Number(r.amount||0),0);
+    const exp = reportRows('expense',org,mode,from,to).reduce((a,r)=>a+Number(r.amount||0),0);
+    return [org, money(inc), money(exp), money(inc-exp)];
+  });
+  const overallInc = ORGS.reduce((a,o)=>a+reportRows('income',o,mode,from,to).reduce((x,r)=>x+Number(r.amount||0),0),0);
+  const overallExp = ORGS.reduce((a,o)=>a+reportRows('expense',o,mode,from,to).reduce((x,r)=>x+Number(r.amount||0),0),0);
+
+  doc.autoTable({ startY:38, head:[['Organization','Income','Expenses','Balance']], body:perOrg,
+    headStyles:{fillColor:[11,46,34]}, styles:{fontSize:10}, margin:{left:14,right:14},
+    foot:[['Overall Summary', money(overallInc), money(overallExp), money(overallInc-overallExp)]],
+    footStyles:{fillColor:[234,251,243], textColor:[11,46,34], fontStyle:'bold'} });
+
+  let y = doc.lastAutoTable.finalY + 10;
+  ORGS.forEach(org=>{
+    const stIn = reportRows('stockin',org,mode,from,to), stOut = reportRows('stockout',org,mode,from,to);
+    doc.setFontSize(12); doc.setTextColor(11,46,34); doc.text(org+' — Stock Movement', 14, y); y+=4;
+    doc.autoTable({ startY:y, head:[['Type','Date','Item','Qty','Unit']],
+      body:[...stIn.map(r=>['Stock In', fmtDate(r.date), r.item, r.qty, r.unit]), ...stOut.map(r=>['Stock Usage', fmtDate(r.date), r.item, r.qty, r.unit])],
+      headStyles:{fillColor:[21,92,67]}, styles:{fontSize:8.5}, margin:{left:14,right:14} });
+    y = doc.lastAutoTable.finalY + 8;
+    if(y > 250 && org!==ORGS[ORGS.length-1]){ doc.addPage(); y=20; }
+  });
+
+  pdfFooter(doc);
+  doc.save(`idara-combined-report-${todayStr()}.pdf`);
+  showToast('Combined report downloaded.');
+}
+function generateSingleRecordPDF(cfg, row){
+  if(typeof window.jspdf==='undefined'){ showToast('PDF library did not load — check your connection.'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const isIncome = cfg.collection==='income';
+  pdfHeader(doc, isIncome?'Payment Receipt':'Payment Voucher');
+  doc.setFontSize(10.5); doc.setTextColor(100,110,105); doc.text(row.org, 14, 31);
+  const rowsToShow = isIncome ?
+    [['Receipt No.', row.receiptNo],['Date', fmtDate(row.date)],['Amount', money(row.amount)],['Payment Method', row.paymentType+(row.upiId?' · '+row.upiId:'')],['Purpose', row.purpose||'—'],['Notes', row.notes||'—']] :
+    [['Voucher No.', row.voucherNo],['Date', fmtDate(row.date)],['Amount', money(row.amount)],['Payment Method', row.paymentType+(row.upiId?' · '+row.upiId:'')],['Purpose', row.purpose||'—'],['Notes', row.notes||'—']];
+  doc.autoTable({ startY:38, body: rowsToShow, styles:{fontSize:10.5}, theme:'plain', margin:{left:14,right:14},
+    columnStyles:{0:{fontStyle:'bold', textColor:[100,110,105], cellWidth:45}} });
+  const y = doc.lastAutoTable.finalY + 30;
+  doc.setFontSize(9.5); doc.setTextColor(100,110,105); doc.text('Authorized Signature: ____________________', 120, y);
+  pdfFooter(doc);
+  doc.save(`${isIncome?'receipt':'voucher'}-${row.receiptNo||row.voucherNo}-${row.org}.pdf`);
+  showToast('PDF downloaded.');
+}
+
+// ================================================================
+// DASHBOARD (now wired to real data)
+// ================================================================
+function renderHome(){
+  const el = document.getElementById('contentArea');
+  setHeaderTitle('Dashboard');
+  setActiveTab('dashboard');
+
+  el.innerHTML = `
+  <div class="dash">
+    <div class="fin-grid">
+      <div class="fin-card fin-card--tap" onclick="openBreakdownModal('income')">
+        <div class="fin-label">Total Income</div><div class="fin-value">${money(totalIncome())}</div>
+      </div>
+      <div class="fin-card fin-card--tap" onclick="openBreakdownModal('expense')">
+        <div class="fin-label">Total Expenses</div><div class="fin-value">${money(totalExpense())}</div>
+      </div>
+      <div class="fin-card fin-card--primary fin-card--tap" onclick="openBreakdownModal('balance')">
+        <div class="fin-label">Total Balance</div><div class="fin-value">${money(totalBalance())}</div>
+      </div>
+    </div>
+
+    <div class="section-heading"><h3>Quick Actions</h3></div>
+    <div class="qa-grid">
+      ${quickActionBtn('Add Income','<path d="M12 19V5M6 11l6-6 6 6" stroke-linecap="round" stroke-linejoin="round"/>','income')}
+      ${quickActionBtn('Add Expense','<path d="M12 5v14M6 13l6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/>','expense')}
+      ${quickActionBtn('Add Stock','<path d="M21 8 12 3 3 8l9 5 9-5z" stroke-linejoin="round"/><path d="M3 8v8l9 5 9-5V8" stroke-linejoin="round"/>','stockin')}
+      ${quickActionBtn('Add Supporter','<path d="M8.5 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M15.5 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M3.5 19c.5-2.8 2.4-4.5 5-4.5s4.5 1.7 5 4.5" stroke-linecap="round"/>','supporters')}
+    </div>
+  </div>`;
+}
+function quickActionBtn(label, iconPath, kind){
+  return `<div class="qa-btn" onclick="quickAction('${kind}')">
+    <div class="qa-icon"><svg viewBox="0 0 24 24">${iconPath}</svg></div>
+    <div class="qa-label">${label}</div>
+  </div>`;
+}
+function quickAction(kind){
+  if(!canWrite()){ showToast('Viewer role cannot add records. Switch role in MHS.'); return; }
+  if(kind==='income') openEntityForm(incomeConfig(null), null, renderHome);
+  else if(kind==='expense') openEntityForm(expenseConfig(null), null, renderHome);
+  else if(kind==='stockin') openEntityForm(stockInConfig(null), null, renderHome);
+  else if(kind==='supporters') openEntityForm(supportersConfig(), null, renderHome);
+}
+
+// ---------------- routing ----------------
+function renderPlaceholder(label){
+  const el = document.getElementById('contentArea');
+  el.innerHTML = `<div class="content-placeholder"><div class="ph-icon"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10" stroke-linecap="round"/></svg></div><h2>Coming Soon</h2><p>This section will be built in a later step.</p><div class="active-tag">${label}</div></div>`;
+}
+function routeLeaf(label){
+  if(label==='Dashboard'){ renderHome(); return; }
+  if(label==='Supporters'){ renderSupportersPage(); return; }
+  if(label.includes(' · ')){
+    const [group, sub] = label.split(' · ');
+    if(ORGS.includes(group)){
+      const map = {'Income':'income','Expenses':'expense','Stock In':'stockin','Stock Usage':'stockout','Stock Balance':'stockbalance'};
+      renderOrgPage(group, map[sub]); return;
+    }
+  }
+  renderPlaceholder(label);
+}
+
+// ---------------- bottom nav ----------------
+
+// ---------------- toast ----------------
+function showToast(msg){
+  const wrap = document.getElementById('toastWrap');
+  const t = document.createElement('div'); t.className='toast'; t.textContent=msg;
+  wrap.appendChild(t); setTimeout(()=>t.remove(), 3000);
+}
+
+// ================================================================
+// BOOT
+// ================================================================
+(async function boot(){
+  const el = document.getElementById('contentArea');
+  el.innerHTML = `<div style="min-height:50vh;display:flex;align-items:center;justify-content:center;color:var(--green-800);font-weight:600;font-size:15px;">Loading IDARA…</div>`;
+  await loadAll();
+  await loadNotifSeen();
+  updateHeaderDate();
+  refreshHeaderBell();
+  renderHome();
+})();
+</script>
+</body>
+</html>
